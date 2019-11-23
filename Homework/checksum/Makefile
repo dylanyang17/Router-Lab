@@ -1,7 +1,7 @@
 CXX ?= g++
 LAB_ROOT ?= ../..
 BACKEND ?= STDIO
-CXXFLAGS ?= --std=c++11 -I $(LAB_ROOT)/HAL/include -DROUTER_BACKEND_$(BACKEND)
+CXXFLAGS ?= --std=c++11 -Wall -Wconversion -Wextra -I $(LAB_ROOT)/HAL/include -DROUTER_BACKEND_$(BACKEND)
 LDFLAGS ?= -lpcap
 
 .PHONY: all clean grade
