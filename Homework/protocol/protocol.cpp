@@ -36,6 +36,13 @@ uint32_t getFourByte(uint8_t *packet) {
       (packet[3] << 0);
 }
 
+void putFourByte(uint8_t *packet, uint32_t num) {
+  packet[0] = (num >> 24) & 0xFF;
+  packet[1] = (num >> 16) & 0xFF;
+  packet[2] = (num >> 8)  & 0xFF;
+  packet[3] = (num >> 0)  & 0xFF;
+}
+
 uint32_t convertBigSmallEndian32(uint32_t num) {
   return (((num >> 0) & 0xFF) << 24) |
       (((num >> 8) & 0xFF) << 16) |
@@ -49,7 +56,7 @@ uint16_t convertBigSmallEndian16(uint16_t num) {
 }
 
 bool checkMask(uint32_t mask) {
-  mask = convertBigSmallEndian(mask);
+  mask = convertBigSmallEndian32(mask);
   int i;
   for (i = 31; i >= 0; --i) {
     if(((mask >> i) & 1) == 0) break;
@@ -122,7 +129,7 @@ bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output) {
     return false;
   uint32_t headLen = (uint32_t)(packet[0] & 0xF) * 4;  // IP Head
   headLen = headLen + 8;  // UDP Head
-  return getRipPacket(packet + headLen, totalLen - headLen, output);
+  return getRipPacket(const_cast<uint8_t*>(packet) + headLen, totalLen - headLen, output);
 }
 
 /**
@@ -135,7 +142,27 @@ bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output) {
  * 你写入 buffer 的数据长度和返回值都应该是四个字节的 RIP 头，加上每项 20 字节。
  * 需要注意一些没有保存在 RipPacket 结构体内的数据的填写。
  */
+
+void assembleRipEntry(const RipEntry *entry, int command, uint8_t *buffer) {
+  // family
+  if (command == 1) buffer[0] = 0;
+  else if (command == 2) buffer[0] = 2;
+  buffer[1] = 0;
+  // tag
+  buffer[2] = buffer[3] = 0;
+  putFourByte(buffer + 4,  entry->addr);
+  putFourByte(buffer + 8,  entry->mask);
+  putFourByte(buffer + 12, entry->nexthop);
+  putFourByte(buffer + 16, entry->metric);
+}
+
 uint32_t assemble(const RipPacket *rip, uint8_t *buffer) {
   // TODO:
-  return 0;
+  buffer[0] = rip->command;
+  buffer[1] = 2;
+  buffer[2] = buffer[3] = 0;
+  for (int i = 0; i < rip->numEntries; ++i) {
+    assembleRipEntry(&rip->entries[i], rip->command, buffer + 4 + i * 20);
+  }
+  return 4 + rip->numEntries * 20;
 }
