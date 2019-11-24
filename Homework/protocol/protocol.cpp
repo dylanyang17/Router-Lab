@@ -36,12 +36,16 @@ uint32_t getFourByte(uint8_t *packet) {
       (packet[3] << 0);
 }
 
-uint32_t convertBigSmallEndian(uint32_t num) {
-  uint32_t ret = 0;
+uint32_t convertBigSmallEndian32(uint32_t num) {
   return (((num >> 0) & 0xFF) << 24) |
       (((num >> 8) & 0xFF) << 16) |
       (((num >> 16)& 0xFF) << 8) |
       (((num >> 24)& 0xFF) << 0);
+}
+
+uint16_t convertBigSmallEndian16(uint16_t num) {
+  return (((num >> 0) & 0xFF) << 8) |
+      (((num >> 8) & 0xFF) << 0);
 }
 
 bool checkMask(uint32_t mask) {
@@ -53,7 +57,33 @@ bool checkMask(uint32_t mask) {
   return (i == -1 || (mask & ((1 << i) - 1)) == 0);
 }
 
-bool getRipEntry(uint8_t *packet, RipEntry *entry) {
+bool getRipEntry(uint8_t *packet, int command, RipEntry *entry) {
+  uint16_t family = convertBigSmallEndian16(((uint16_t)packet[0] << 8) + packet[1]);
+  if ((command == 1 && family != 0) || (command == 2 && family != 2))
+    // Family
+    return false;
+  if (packet[6] != 2 || packet[7] != 3)
+    // Tag
+    return false;
+  entry->addr = getFourByte(packet + 4);
+  entry->mask = getFourByte(packet + 8);
+  entry->nexthop = getFourByte(packet + 12);
+  entry->metric = getFourByte(packet + 16);
+  uint32_t tmp = convertBigSmallEndian32(entry->metric);
+  if (tmp < 1 || tmp > 16)
+    // Metric
+    return false;
+  if (!checkMask(entry->mask))
+    // Mask
+    return false;
+  return true;
+}
+
+bool getRipPacket(uint8_t *packet, uint32_t len, RipPacket *ripPacket) {
+  if ((len - 4) % 20 != 0)
+    return false;
+  ripPacket->numEntries = (len - 4) / 20;
+  int command = packet[0];
   if (packet[0] != 1 && packet[0] != 2)
     // Command
     return false;
@@ -63,24 +93,10 @@ bool getRipEntry(uint8_t *packet, RipEntry *entry) {
   if (packet[2] != 0 || packet[3] != 0)
     // Zero
     return false;
-  uint16_t family = ((uint16_t)packet[4] << 8) + packet[5];
-  if ((packet[0] == 1 && family != 0) || (packet[0] == 2 && family != 2))
-    // Family
-    return false;
-  if (packet[6] != 0 || packet[7] != 0)
-    // Tag
-    return false;
-  entry->addr = getFourByte(packet + 8);
-  entry->mask = getFourByte(packet + 12);
-  entry->nexthop = getFourByte(packet + 16);
-  entry->metric = getFourByte(packet + 20);
-  uint32_t tmp = convertBigSmallEndian(entry->metric);
-  if (tmp < 1 || tmp > 16)
-    // Metric
-    return false;
-  if (!checkMask(entry->mask))
-    // Mask
-    return false;
+  for (int i = 0; i < ripPacket->numEntries; ++i) {
+    if (!getRipEntry(packet + 4 + i * 20, command, &ripPacket->entries[i]))
+      return false;
+  }
   return true;
 }
 
@@ -100,7 +116,13 @@ bool getRipEntry(uint8_t *packet, RipEntry *entry) {
  */
 bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output) {
   // TODO:
-
+  uint32_t totalLen = convertBigSmallEndian16(((uint16_t)packet[2] << 8) + packet[3]);
+  if (totalLen > len)
+    // totalLen
+    return false;
+  uint32_t headLen = (uint32_t)(packet[0] & 0xF) * 4;  // IP Head
+  headLen = headLen + 8;  // UDP Head
+  return getRipPacket(packet + headLen, totalLen - headLen, output);
 }
 
 /**
