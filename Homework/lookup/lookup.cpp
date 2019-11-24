@@ -70,7 +70,6 @@ uint32_t convertBigSmallEndian(uint32_t num) {
       (((num >> 8) & 0xFF) << 16) |
       (((num >> 16)& 0xFF) << 8) |
       (((num >> 24)& 0xFF) << 0);
-
 }
 
 bool match(const RoutingTableEntry &entry, uint32_t addr) {

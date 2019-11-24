@@ -69,7 +69,7 @@ bool getRipEntry(uint8_t *packet, int command, RipEntry *entry) {
   if ((command == 1 && family != 0) || (command == 2 && family != 2))
     // Family
     return false;
-  if (packet[6] != 2 || packet[7] != 3)
+  if (packet[2] != 0 || packet[3] != 0)
     // Tag
     return false;
   entry->addr = getFourByte(packet + 4);
