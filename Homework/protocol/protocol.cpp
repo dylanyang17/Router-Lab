@@ -29,6 +29,61 @@
   需要注意这里的地址都是用 **大端序** 存储的，1.2.3.4 对应 0x04030201 。
 */
 
+uint32_t getFourByte(uint8_t *packet) {
+  return (packet[0] << 24) |
+      (packet[1] << 16) |
+      (packet[2] << 8) |
+      (packet[3] << 0);
+}
+
+uint32_t convertBigSmallEndian(uint32_t num) {
+  uint32_t ret = 0;
+  return (((num >> 0) & 0xFF) << 24) |
+      (((num >> 8) & 0xFF) << 16) |
+      (((num >> 16)& 0xFF) << 8) |
+      (((num >> 24)& 0xFF) << 0);
+}
+
+bool checkMask(uint32_t mask) {
+  mask = convertBigSmallEndian(mask);
+  int i;
+  for (i = 31; i >= 0; --i) {
+    if(((mask >> i) & 1) == 0) break;
+  }
+  return (i == -1 || (mask & ((1 << i) - 1)) == 0);
+}
+
+bool getRipEntry(uint8_t *packet, RipEntry *entry) {
+  if (packet[0] != 1 && packet[0] != 2)
+    // Command
+    return false;
+  if (packet[1] != 2)
+    // Version
+    return false;
+  if (packet[2] != 0 || packet[3] != 0)
+    // Zero
+    return false;
+  uint16_t family = ((uint16_t)packet[4] << 8) + packet[5];
+  if ((packet[0] == 1 && family != 0) || (packet[0] == 2 && family != 2))
+    // Family
+    return false;
+  if (packet[6] != 0 || packet[7] != 0)
+    // Tag
+    return false;
+  entry->addr = getFourByte(packet + 8);
+  entry->mask = getFourByte(packet + 12);
+  entry->nexthop = getFourByte(packet + 16);
+  entry->metric = getFourByte(packet + 20);
+  uint32_t tmp = convertBigSmallEndian(entry->metric);
+  if (tmp < 1 || tmp > 16)
+    // Metric
+    return false;
+  if (!checkMask(entry->mask))
+    // Mask
+    return false;
+  return true;
+}
+
 /**
  * @brief 从接受到的 IP 包解析出 Rip 协议的数据
  * @param packet 接受到的 IP 包
@@ -45,7 +100,7 @@
  */
 bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output) {
   // TODO:
-  return false;
+
 }
 
 /**
