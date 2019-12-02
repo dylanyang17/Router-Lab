@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
     in_addr_t src_addr, dst_addr;
     // extract src_addr and dst_addr from packet
     // big endian
-    src_addr = packet[12]
+    //src_addr = packet[12]
 
     bool dst_is_me = false;
     for (int i = 0; i < N_IFACE_ON_BOARD;i++) {
