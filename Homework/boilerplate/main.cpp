@@ -12,6 +12,7 @@ extern bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index);
 extern bool forward(uint8_t *packet, size_t len);
 extern bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output);
 extern uint32_t assemble(const RipPacket *rip, uint8_t *buffer);
+extern uint32_t getFourByte(uint8_t *packet);
 
 uint8_t packet[2048];
 uint8_t output[2048];
@@ -49,7 +50,7 @@ int main(int argc, char *argv[]) {
     uint64_t time = HAL_GetTicks();
     if (time > last_time + 30 * 1000) {
       // What to do?
-      // TODO 发送更新报文
+      // TODO 例行更新 ?
       last_time = time;
       printf("Timer\n");
     }
@@ -79,6 +80,7 @@ int main(int argc, char *argv[]) {
     in_addr_t src_addr, dst_addr;
     // extract src_addr and dst_addr from packet
     // big endian
+    src_addr = packet[12]
 
     bool dst_is_me = false;
     for (int i = 0; i < N_IFACE_ON_BOARD;i++) {

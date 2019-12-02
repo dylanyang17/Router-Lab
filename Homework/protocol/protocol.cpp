@@ -1,4 +1,5 @@
 #include "rip.h"
+#include <cstdio>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -29,34 +30,29 @@
   需要注意这里的地址都是用 **大端序** 存储的，1.2.3.4 对应 0x04030201 。
 */
 
-uint32_t getFourByte(uint8_t *packet) {
-  return (packet[0] << 24) |
-      (packet[1] << 16) |
-      (packet[2] << 8) |
-      (packet[3] << 0);
-}
-
-void putFourByte(uint8_t *packet, uint32_t num) {
-  packet[0] = (num >> 24) & 0xFF;
-  packet[1] = (num >> 16) & 0xFF;
-  packet[2] = (num >> 8)  & 0xFF;
-  packet[3] = (num >> 0)  & 0xFF;
-}
-
-uint32_t convertBigSmallEndian32(uint32_t num) {
+uint32_t convertBigSmallEndian(uint32_t num) {
   return (((num >> 0) & 0xFF) << 24) |
       (((num >> 8) & 0xFF) << 16) |
       (((num >> 16)& 0xFF) << 8) |
       (((num >> 24)& 0xFF) << 0);
 }
 
-uint16_t convertBigSmallEndian16(uint16_t num) {
-  return (((num >> 0) & 0xFF) << 8) |
-      (((num >> 8) & 0xFF) << 0);
+uint32_t getFourByte(uint8_t *packet) {
+  return (packet[0] << 0) |
+      (packet[1] << 8) |
+      (packet[2] << 16) |
+      (packet[3] << 24);
+}
+
+void putFourByte(uint8_t *packet, uint32_t num) {
+  packet[0] = (num >> 0) & 0xFF;
+  packet[1] = (num >> 8) & 0xFF;
+  packet[2] = (num >> 16)  & 0xFF;
+  packet[3] = (num >> 24)  & 0xFF;
 }
 
 bool checkMask(uint32_t mask) {
-  mask = convertBigSmallEndian32(mask);
+  mask = convertBigSmallEndian(mask);
   int i;
   for (i = 31; i >= 0; --i) {
     if(((mask >> i) & 1) == 0) break;
@@ -65,7 +61,7 @@ bool checkMask(uint32_t mask) {
 }
 
 bool getRipEntry(uint8_t *packet, int command, RipEntry *entry) {
-  uint16_t family = convertBigSmallEndian16(((uint16_t)packet[0] << 8) + packet[1]);
+  uint16_t family = ((uint16_t)packet[0] << 8) + packet[1];
   if ((command == 1 && family != 0) || (command == 2 && family != 2))
     // Family
     return false;
@@ -76,7 +72,7 @@ bool getRipEntry(uint8_t *packet, int command, RipEntry *entry) {
   entry->mask = getFourByte(packet + 8);
   entry->nexthop = getFourByte(packet + 12);
   entry->metric = getFourByte(packet + 16);
-  uint32_t tmp = convertBigSmallEndian32(entry->metric);
+  uint32_t tmp = convertBigSmallEndian(entry->metric);
   if (tmp < 1 || tmp > 16)
     // Metric
     return false;
@@ -90,6 +86,7 @@ bool getRipPacket(uint8_t *packet, uint32_t len, RipPacket *ripPacket) {
   if ((len - 4) % 20 != 0)
     return false;
   ripPacket->numEntries = (len - 4) / 20;
+  ripPacket->command = packet[0];
   int command = packet[0];
   if (packet[0] != 1 && packet[0] != 2)
     // Command
@@ -123,7 +120,7 @@ bool getRipPacket(uint8_t *packet, uint32_t len, RipPacket *ripPacket) {
  */
 bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output) {
   // TODO:
-  uint32_t totalLen = convertBigSmallEndian16(((uint16_t)packet[2] << 8) + packet[3]);
+  uint32_t totalLen = ((uint16_t)packet[2] << 8) + packet[3];
   if (totalLen > len)
     // totalLen
     return false;
@@ -145,9 +142,9 @@ bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output) {
 
 void assembleRipEntry(const RipEntry *entry, int command, uint8_t *buffer) {
   // family
-  if (command == 1) buffer[0] = 0;
-  else if (command == 2) buffer[0] = 2;
-  buffer[1] = 0;
+  buffer[0] = 0;
+  if (command == 1) buffer[1] = 0;
+  else if (command == 2) buffer[1] = 2;
   // tag
   buffer[2] = buffer[3] = 0;
   putFourByte(buffer + 4,  entry->addr);

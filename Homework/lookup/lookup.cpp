@@ -22,6 +22,22 @@ typedef struct {
    你可以在全局变量中把路由表以一定的数据结构格式保存下来。
  */
 
+int find(const RoutingTableEntry &entry) {
+  // 找到 addr 和 len 同 entry 均相同的表项，返回其下标，未找到则返回 -1
+  for (int i = 0; i < MAXN; ++i) {
+    if (table[i].addr == entry.addr && table[i].len == entry.len && enabled[i])
+      return i;
+  }
+  return -1;
+}
+
+int findEmpty() {
+    if (enabled[i] == false)
+      return i;
+  }
+  return -1;
+}
+
 /**
  * @brief 插入/删除一条路由表表项
  * @param insert 如果要插入则为 true ，要删除则为 false
@@ -31,24 +47,7 @@ typedef struct {
  * 删除时按照 addr 和 len 匹配。
  */
 
-int find(const RoutingTableEntry &entry) {
-  for (int i = 0; i < MAXN; ++i) {
-    if (table[i].addr == entry.addr && table[i].len == entry.len && enabled[i])
-      return i;
-  }
-  return -1;
-}
-
-int findEmpty() {
-  for (int i = 0; i < MAXN; ++i) {
-    if (enabled[i] == false)
-      return i;
-  }
-  return -1;
-}
-
 void update(bool insert, RoutingTableEntry entry) {
-    // TODO:
   int ind = find(entry);
   if (ind != -1) {
     if (insert) {
@@ -64,7 +63,7 @@ void update(bool insert, RoutingTableEntry entry) {
   }
 }
 
-uint32_t convertBigSmallEndian(uint32_t num) {
+uint32_t convertBigSmallEndian32(uint32_t num) {
   uint32_t ret = 0;
   return (((num >> 0) & 0xFF) << 24) |
       (((num >> 8) & 0xFF) << 16) |
@@ -73,8 +72,8 @@ uint32_t convertBigSmallEndian(uint32_t num) {
 }
 
 bool match(const RoutingTableEntry &entry, uint32_t addr) {
-  uint32_t addr2 = convertBigSmallEndian(entry.addr);
-  addr = convertBigSmallEndian(addr);
+  uint32_t addr2 = convertBigSmallEndian32(entry.addr);
+  addr = convertBigSmallEndian32(addr);
   for (int i = 0; i < entry.len; ++i) {
     if ((addr & (1 << (31-i))) != (addr2 & (1 << (31-i))))
       return false;
@@ -90,17 +89,16 @@ bool match(const RoutingTableEntry &entry, uint32_t addr) {
  * @return 查到则返回 true ，没查到则返回 false
  */
 bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index) {
-    // TODO:
-    int ind = -1;
-    for (int i = 0; i < MAXN; ++i) {
-      if (enabled[i] && match(table[i], addr)) {
-        if (ind == -1 || table[i].len > table[ind].len)
-          ind = i;
-      }
+  int ind = -1;
+  for (int i = 0; i < MAXN; ++i) {
+    if (enabled[i] && match(table[i], addr)) {
+      if (ind == -1 || table[i].len > table[ind].len)
+        ind = i;
     }
-    if (ind == -1)
-      return false;
-    *nexthop = table[ind].nexthop;
-    *if_index = table[ind].if_index;
-    return true;
+  }
+  if (ind == -1)
+    return false;
+  *nexthop = table[ind].nexthop;
+  *if_index = table[ind].if_index;
+  return true;
 }
