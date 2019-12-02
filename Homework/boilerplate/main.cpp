@@ -49,6 +49,8 @@ int main(int argc, char *argv[]) {
     uint64_t time = HAL_GetTicks();
     if (time > last_time + 30 * 1000) {
       // What to do?
+      // TODO 发送更新报文
+      last_time = time;
       printf("Timer\n");
     }
 
