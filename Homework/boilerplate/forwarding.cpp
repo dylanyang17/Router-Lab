@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
-
+/* 删除重复代码
 uint16_t calcIPChecksum(uint8_t *packet, size_t len) {
   size_t headLen = (size_t)(packet[0] & 0xF) * 4;
   uint32_t sum = 0;       // 计算得到的校验和
@@ -16,12 +16,13 @@ uint16_t calcIPChecksum(uint8_t *packet, size_t len) {
   return sum ^ 0xFFFF ;
 }
 
+
 bool validateIPChecksum(uint8_t *packet, size_t len) {
   uint16_t sum = calcIPChecksum(packet, len);       // 计算得到的校验和
   uint16_t pracsum = ((uint16_t)packet[10] << 8) + packet[11];
   return sum == pracsum;
 }
-
+*/
 /**
  * @brief 进行转发时所需的 IP 头的更新：
  *        你需要先检查 IP 头校验和的正确性，如果不正确，直接返回 false ；
@@ -31,6 +32,10 @@ bool validateIPChecksum(uint8_t *packet, size_t len) {
  * @param len 即 packet 的长度，单位为字节
  * @return 校验和无误则返回 true ，有误则返回 false
  */
+
+extern uint16_t calcIPChecksum(uint8_t *packet, size_t len);
+extern bool validateIPChecksum(uint8_t *packet, size_t len);
+
 bool forward(uint8_t *packet, size_t len) {
   // TODO:
   if (validateIPChecksum(packet, len) == false)
