@@ -19,7 +19,7 @@ grade: lookup
 hal.o: $(LAB_ROOT)/HAL/src/stdio/router_hal.cpp
 	$(CXX) $(CXXFLAGS) -c $^ -o $@
 
-lookup: lookup.o main.o hal.o
+lookup: lookup.o main.o hal.o util.o
 	$(CXX) $^ -o $@ $(LDFLAGS) 
 
 std: std.o main.o hal.o

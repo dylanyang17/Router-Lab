@@ -22,6 +22,10 @@ typedef struct {
    你可以在全局变量中把路由表以一定的数据结构格式保存下来。
  */
 
+extern uint32_t convertBigSmallEndian32(uint32_t num);
+extern uint32_t getMaskFromLen(uint32_t len);
+extern uint32_t getNetworkSegment(uint32_t addr, uint32_t len);
+
 int find(const RoutingTableEntry &entry) {
   // 找到 addr 和 len 同 entry 均相同的表项，返回其下标，未找到则返回 -1
   for (int i = 0; i < MAXN; ++i) {
@@ -32,6 +36,8 @@ int find(const RoutingTableEntry &entry) {
 }
 
 int findEmpty() {
+  // 找到一个空表项下标
+  for (int i = 0; i < MAXN; ++i) {
     if (enabled[i] == false)
       return i;
   }
@@ -48,6 +54,8 @@ int findEmpty() {
  */
 
 void update(bool insert, RoutingTableEntry entry) {
+  // NOTE: 注意这里对 entry 进行了子网掩码的与操作，以保证entry的addr的主机标识为0，即仅最低 len 位可能出现非零
+  entry.addr = getNetworkSegment(entry.addr, entry.len);
   int ind = find(entry);
   if (ind != -1) {
     if (insert) {
@@ -63,15 +71,8 @@ void update(bool insert, RoutingTableEntry entry) {
   }
 }
 
-uint32_t convertBigSmallEndian32(uint32_t num) {
-  uint32_t ret = 0;
-  return (((num >> 0) & 0xFF) << 24) |
-      (((num >> 8) & 0xFF) << 16) |
-      (((num >> 16)& 0xFF) << 8) |
-      (((num >> 24)& 0xFF) << 0);
-}
-
 bool match(const RoutingTableEntry &entry, uint32_t addr) {
+  // 判断地址 addr 是否处在 entry 所表示的网段中（由entry.addr和entry.len确定网段）
   uint32_t addr2 = convertBigSmallEndian32(entry.addr);
   addr = convertBigSmallEndian32(addr);
   for (int i = 0; i < entry.len; ++i) {

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 extern bool validateIPChecksum(uint8_t *packet, size_t len);
 extern void update(bool insert, RoutingTableEntry entry);
@@ -25,6 +26,7 @@ extern bool enabled[MAXN];
 
 uint8_t packet[2048];
 uint8_t output[2048];
+uint16_t ipTag;  // ip头中的16位标识
 // 0: 10.0.0.1
 // 1: 10.0.1.1
 // 2: 10.0.2.1
@@ -36,8 +38,13 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip) {
   // 将 rip 封装 UDP 和 IP 头，并从索引为 if_index 的网络接口发送出去
   // assemble
   // IP
+  ++ipTag;
   output[0] = 0x45;
-  // ...
+  output[1] = ?;
+  output[2] = ((rip_len + 20 + 8) >> 8) & 0xFF;
+  output[3] = (rip_len + 20 + 8) & 0xFF;
+  output[4] = (ipTag >> 8) & 0xFF;
+  output[5] = ipTag & 0xFF;
   // UDP
   // port = 520
   output[20] = 0x02;
@@ -52,6 +59,8 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip) {
 }
 
 int main(int argc, char *argv[]) {
+  srand(time(NULL));
+  ipTag = (uint32_t)rand();
   int res = HAL_Init(1, addrs);
   if (res < 0) {
     return res;

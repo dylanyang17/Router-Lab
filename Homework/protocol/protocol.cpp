@@ -38,6 +38,8 @@ uint32_t convertBigSmallEndian(uint32_t num) {
 }
 
 uint32_t getFourByte(uint8_t *packet) {
+  // 按网络传输的顺序读入 4 字节（注意本机为小端序，低位字节在前，而传输按从前到后进行，故packet[0](即“前”)对应低位，而packet[3](即“后”)对应高位）
+  // 这样读进来便不会改变传输内容的大小端，即保持网络字节的大端序（也就是说在本机还需要转换之后才能使用）
   return (packet[0] << 0) |
       (packet[1] << 8) |
       (packet[2] << 16) |
@@ -45,6 +47,7 @@ uint32_t getFourByte(uint8_t *packet) {
 }
 
 void putFourByte(uint8_t *packet, uint32_t num) {
+  // 按网络传输顺序放入 4 字节
   packet[0] = (num >> 0) & 0xFF;
   packet[1] = (num >> 8) & 0xFF;
   packet[2] = (num >> 16)  & 0xFF;
@@ -52,6 +55,7 @@ void putFourByte(uint8_t *packet, uint32_t num) {
 }
 
 bool checkMask(uint32_t mask) {
+  // 检验 mask 是否合法——即连续的 1 后跟上连续的 0
   mask = convertBigSmallEndian(mask);
   int i;
   for (i = 31; i >= 0; --i) {
@@ -61,6 +65,8 @@ bool checkMask(uint32_t mask) {
 }
 
 bool getRipEntry(uint8_t *packet, int command, RipEntry *entry) {
+  // 从 packet 中读入一个 command 类型的 rip 条目，注意传入的 packet 起始已经是 family 字段了，存入 entry 中
+  // 成功返回 true，失败(不合法等)返回 false
   uint16_t family = ((uint16_t)packet[0] << 8) + packet[1];
   if ((command == 1 && family != 0) || (command == 2 && family != 2))
     // Family
@@ -83,6 +89,8 @@ bool getRipEntry(uint8_t *packet, int command, RipEntry *entry) {
 }
 
 bool getRipPacket(uint8_t *packet, uint32_t len, RipPacket *ripPacket) {
+  // 从 packet 中读入若干 rip 条目并存入 RipPacket 对象
+  // 成功返回 true，失败(不合法)等返回 false
   if ((len - 4) % 20 != 0)
     return false;
   ripPacket->numEntries = (len - 4) / 20;
