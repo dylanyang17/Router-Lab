@@ -37,14 +37,21 @@ bool checkMask(uint32_t mask) {
   return (i == -1 || (mask & ((1 << i) - 1)) == 0);
 }
 
-extern bool isMulticastAddress(const in_addr_t &addr) {
+bool isMulticastAddress(const in_addr_t &addr) {
   // 判断是否为 ripv2 组播地址 224.0.0.9
   return addr == 0x090000E0;
 }
 
 uint32_t getMaskFromLen(uint32_t len) {
-  // 从子网掩码长度生成子网掩码
+  // 从子网掩码长度生成小端序的子网掩码【注意此处为小端序，主要是便于计算】
   return (~((1 << (32 - len)) - 1));
+}
+
+uint32_t getNetworkSegment(in_addr_t addr, uint32_t len) {
+  // 计算网络标识，注意为大端序
+  uint32_t mask = getMaskFromLen(len);
+  addr = convertBigSmallEndian32(addr) & mask;
+  return convertBigSmallEndian32(addr);
 }
 
 bool isInSameNetworkSegment(in_addr_t addr1, in_addr_t addr2, uint32_t len) {

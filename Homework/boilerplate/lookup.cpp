@@ -12,8 +12,8 @@ typedef struct {
   uint32_t addr; // 大端序，IPv4 地址
   uint32_t len; // 小端序，前缀长度
   uint32_t if_index; // 小端序，出端口编号
+  uint32_t metric;   // 小端序
   uint32_t nexthop; // 大端序，下一跳的 IPv4 地址
-  bool enabled; // Whether is enabled
 } RoutingTableEntry;
    约定 addr 和 nexthop 以 **大端序** 存储。
    这意味着 1.2.3.4 对应 0x04030201 而不是 0x01020304。

@@ -32,6 +32,25 @@ uint8_t output[2048];
 // 你可以按需进行修改，注意端序
 in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0100000a, 0x0101000a, 0x0102000a, 0x0103000a};
 
+void sendRipPacket(const uint32_t &if_index, const RipPacket &rip) {
+  // 将 rip 封装 UDP 和 IP 头，并从索引为 if_index 的网络接口发送出去
+  // assemble
+  // IP
+  output[0] = 0x45;
+  // ...
+  // UDP
+  // port = 520
+  output[20] = 0x02;
+  output[21] = 0x08;
+  // ...
+  // RIP
+  uint32_t rip_len = assemble(&rip, &output[20 + 8]);
+  // checksum calculation for ip and udp
+  // if you don't want to calculate udp checksum, set it to zero
+  // send it back
+  HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, src_mac);
+}
+
 int main(int argc, char *argv[]) {
   int res = HAL_Init(1, addrs);
   if (res < 0) {
@@ -49,6 +68,7 @@ int main(int argc, char *argv[]) {
       .addr = addrs[i], // big endian
       .len = 24, // small endian
       .if_index = i, // small endian
+      .metric = 1,  // small endian
       .nexthop = 0 // big endian, means direct
     };
     update(true, entry);
@@ -112,6 +132,7 @@ int main(int argc, char *argv[]) {
             // 请求报文必须满足 metric 为 16，注意 metric 为大端序
             uint32_t metricSmall = convertBigSmallEndian32(rip.entries[i].metric);
             if (metricSmall != 16) continue;
+            // TODO TODO 注意若表项数目大于 25，则需要分开发送
             RipPacket resp;
             // TODO 封装响应报文，注意选择路由条目
             resp.command = 2;  // response
@@ -119,25 +140,13 @@ int main(int argc, char *argv[]) {
               if (enabled[i] && !isInSameNetworkSegment(table[i].addr, src_addr, table[i].len)) {
                 // 与来源ip的网段不同
                 uint32_t id = resp.numEntries++;
-                // resp.entries[id].addr TODO
+                resp.entries[id].addr = table[i].addr;
+                resp.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
+                resp.entries[id].nexthop = table[i].nexthop;
+                resp.entries[id].metric = convertBigSmallEndian32(table[i].metric);
               }
             }
-
-            // assemble
-            // IP
-            output[0] = 0x45;
-            // ...
-            // UDP
-            // port = 520
-            output[20] = 0x02;
-            output[21] = 0x08;
-            // ...
-            // RIP
-            uint32_t rip_len = assemble(&rip, &output[20 + 8]);
-            // checksum calculation for ip and udp
-            // if you don't want to calculate udp checksum, set it to zero
-            // send it back
-            HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, src_mac);
+            sendRipPacket(if_index, resp);
           } else {
             // response
             // TODO: use query and update
