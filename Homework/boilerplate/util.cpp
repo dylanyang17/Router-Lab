@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-uint32_t convertBigSmallEndian(uint32_t num) {
+uint32_t convertBigSmallEndian32(uint32_t num) {
   return (((num >> 0) & 0xFF) << 24) |
       (((num >> 8) & 0xFF) << 16) |
       (((num >> 16)& 0xFF) << 8) |
@@ -28,10 +28,29 @@ void putFourByte(uint8_t *packet, uint32_t num) {
 
 bool checkMask(uint32_t mask) {
   // 检验 mask 是否合法——即连续的 1 后跟上连续的 0
-  mask = convertBigSmallEndian(mask);
+  mask = convertBigSmallEndian32(mask);
   int i;
   for (i = 31; i >= 0; --i) {
     if(((mask >> i) & 1) == 0) break;
   }
   return (i == -1 || (mask & ((1 << i) - 1)) == 0);
+}
+
+extern bool isMulticastAddress(const in_addr_t &addr) {
+  // 判断是否为 ripv2 组播地址 224.0.0.9
+  return addr == 0x090000E0;
+}
+
+uint32_t getMaskFromLen(uint32_t len) {
+  // 从子网掩码长度生成子网掩码
+  return (~((1 << (32 - len)) - 1));
+}
+
+bool isInSameNetworkSegment(in_addr_t addr1, in_addr_t addr2, uint32_t len) {
+  // 判断两个 ip 地址（子网掩码由len确定）是否在同一网段
+  // addr1和addr2为大端序，len为小端序
+  addr1 = convertBigSmallEndian32(addr1);
+  addr2 = convertBigSmallEndian32(addr2);
+  uint32_t mask = getMaskFromLen(len);
+  return (addr1 & mask) == (addr2 & mask);
 }

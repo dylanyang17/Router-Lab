@@ -30,7 +30,7 @@
   需要注意这里的地址都是用 **大端序** 存储的，1.2.3.4 对应 0x04030201 。
 */
 
-extern uint32_t convertBigSmallEndian(uint32_t num);
+extern uint32_t convertBigSmallEndian32(uint32_t num);
 extern uint32_t getFourByte(uint8_t *packet);
 extern void putFourByte(uint8_t *packet, uint32_t num);
 extern bool checkMask(uint32_t mask);
@@ -49,7 +49,7 @@ bool getRipEntry(uint8_t *packet, int command, RipEntry *entry) {
   entry->mask = getFourByte(packet + 8);
   entry->nexthop = getFourByte(packet + 12);
   entry->metric = getFourByte(packet + 16);
-  uint32_t tmp = convertBigSmallEndian(entry->metric);
+  uint32_t tmp = convertBigSmallEndian32(entry->metric);
   if (tmp < 1 || tmp > 16)
     // Metric
     return false;

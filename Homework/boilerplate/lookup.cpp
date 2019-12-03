@@ -22,7 +22,7 @@ typedef struct {
    你可以在全局变量中把路由表以一定的数据结构格式保存下来。
  */
 
-extern uint32_t convertBigSmallEndian(uint32_t num);
+extern uint32_t convertBigSmallEndian32(uint32_t num);
 
 int find(const RoutingTableEntry &entry) {
   // 找到 addr 和 len 同 entry 均相同的表项，返回其下标，未找到则返回 -1
@@ -68,8 +68,8 @@ void update(bool insert, RoutingTableEntry entry) {
 }
 
 bool match(const RoutingTableEntry &entry, uint32_t addr) {
-  uint32_t addr2 = convertBigSmallEndian(entry.addr);
-  addr = convertBigSmallEndian(addr);
+  uint32_t addr2 = convertBigSmallEndian32(entry.addr);
+  addr = convertBigSmallEndian32(addr);
   for (int i = 0; i < entry.len; ++i) {
     if ((addr & (1 << (31-i))) != (addr2 & (1 << (31-i))))
       return false;

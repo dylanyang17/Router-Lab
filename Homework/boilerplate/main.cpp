@@ -13,6 +13,15 @@ extern bool forward(uint8_t *packet, size_t len);
 extern bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output);
 extern uint32_t assemble(const RipPacket *rip, uint8_t *buffer);
 extern uint32_t getFourByte(uint8_t *packet);
+extern uint32_t convertBigSmallEndian32(uint32_t num);
+
+extern bool isMulticastAddress(const in_addr_t &addr);
+extern uint32_t getMaskFromLen(uint32_t len);
+extern bool isInSameNetworkSegment(in_addr_t addr1, in_addr_t addr2, uint32_t len);
+
+extern const int MAXN = 105;
+extern RoutingTableEntry table[MAXN];
+extern bool enabled[MAXN];
 
 uint8_t packet[2048];
 uint8_t output[2048];
@@ -28,7 +37,7 @@ int main(int argc, char *argv[]) {
   if (res < 0) {
     return res;
   }
-  
+
   // Add direct routes
   // For example:
   // 10.0.0.0/24 if 0
@@ -50,7 +59,7 @@ int main(int argc, char *argv[]) {
     uint64_t time = HAL_GetTicks();
     if (time > last_time + 30 * 1000) {
       // What to do?
-      // TODO 例行更新 ?
+      // TODO 例行更新 进行查询？
       last_time = time;
       printf("Timer\n");
     }
@@ -60,7 +69,7 @@ int main(int argc, char *argv[]) {
     macaddr_t dst_mac;
     int if_index;
     res = HAL_ReceiveIPPacket(mask, packet, sizeof(packet), src_mac,
-                                  dst_mac, 1000, &if_index);
+        dst_mac, 1000, &if_index);
     if (res == HAL_ERR_EOF) {
       break;
     } else if (res < 0) {
@@ -80,7 +89,8 @@ int main(int argc, char *argv[]) {
     in_addr_t src_addr, dst_addr;
     // extract src_addr and dst_addr from packet
     // big endian
-    //src_addr = packet[12]
+    src_addr = getFourByte(packet + 12);
+    dst_addr = getFourByte(packet + 16);
 
     bool dst_is_me = false;
     for (int i = 0; i < N_IFACE_ON_BOARD;i++) {
@@ -90,33 +100,47 @@ int main(int argc, char *argv[]) {
       }
     }
     // TODO: Handle rip multicast address?
-
-    if (dst_is_me) {
+    bool isMulti = isMulticastAddress(dst_addr);
+    if (isMulti || dst_is_me) {  // 224.0.0.9 or me
       // TODO: RIP?
       RipPacket rip;
       if (disassemble(packet, res, &rip)) {
-        if (rip.command == 1) {
-          // request
-          RipPacket resp;
-          // TODO: fill resp
-          // assemble
-          // IP
-          output[0] = 0x45;
-          // ...
-          // UDP
-          // port = 520
-          output[20] = 0x02;
-          output[21] = 0x08;
-          // ...
-          // RIP
-          uint32_t rip_len = assemble(&rip, &output[20 + 8]);
-          // checksum calculation for ip and udp
-          // if you don't want to calculate udp checksum, set it to zero
-          // send it back
-          HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, src_mac);
-        } else {
-          // response
-          // TODO: use query and update
+        for (int i = 0; i < rip.numEntries; ++i) {
+          // 注意可能有多组 rip 条目
+          if (rip.command == 1) {
+            // request
+            // 请求报文必须满足 metric 为 16，注意 metric 为大端序
+            uint32_t metricSmall = convertBigSmallEndian32(rip.entries[i].metric);
+            if (metricSmall != 16) continue;
+            RipPacket resp;
+            // TODO 封装响应报文，注意选择路由条目
+            resp.command = 2;  // response
+            for (int i = 0; i < MAXN; ++i) {
+              if (enabled[i] && !isInSameNetworkSegment(table[i].addr, src_addr, table[i].len)) {
+                uint32_t id = resp.numEntries++;
+                // resp.entries[id].addr TODO
+              }
+            }
+
+            // assemble
+            // IP
+            output[0] = 0x45;
+            // ...
+            // UDP
+            // port = 520
+            output[20] = 0x02;
+            output[21] = 0x08;
+            // ...
+            // RIP
+            uint32_t rip_len = assemble(&rip, &output[20 + 8]);
+            // checksum calculation for ip and udp
+            // if you don't want to calculate udp checksum, set it to zero
+            // send it back
+            HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, src_mac);
+          } else {
+            // response
+            // TODO: use query and update
+          }
         }
       } else {
         // forward
