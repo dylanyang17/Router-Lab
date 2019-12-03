@@ -117,6 +117,7 @@ int main(int argc, char *argv[]) {
             resp.command = 2;  // response
             for (int i = 0; i < MAXN; ++i) {
               if (enabled[i] && !isInSameNetworkSegment(table[i].addr, src_addr, table[i].len)) {
+                // 与来源ip的网段不同
                 uint32_t id = resp.numEntries++;
                 // resp.entries[id].addr TODO
               }

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include "router_hal.h"
 
 uint32_t convertBigSmallEndian32(uint32_t num) {
   return (((num >> 0) & 0xFF) << 24) |

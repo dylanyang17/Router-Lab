@@ -23,6 +23,7 @@ typedef struct {
  */
 
 extern uint32_t convertBigSmallEndian32(uint32_t num);
+extern uint32_t getMaskFromLen(uint32_t len);
 
 int find(const RoutingTableEntry &entry) {
   // 找到 addr 和 len 同 entry 均相同的表项，返回其下标，未找到则返回 -1
@@ -52,6 +53,8 @@ int findEmpty() {
  */
 
 void update(bool insert, RoutingTableEntry entry) {
+  // NOTE: 注意这里对 entry 进行了子网掩码的与操作，以保证entry的addr的主机标识为0，即仅最低 len 位可能出现非零
+  entry.addr &= getMaskFromLen(entry.len);
   int ind = find(entry);
   if (ind != -1) {
     if (insert) {
@@ -68,6 +71,7 @@ void update(bool insert, RoutingTableEntry entry) {
 }
 
 bool match(const RoutingTableEntry &entry, uint32_t addr) {
+  // 判断地址 addr 是否处在 entry 所表示的网段中（由entry.addr和entry.len确定网段）
   uint32_t addr2 = convertBigSmallEndian32(entry.addr);
   addr = convertBigSmallEndian32(addr);
   for (int i = 0; i < entry.len; ++i) {
