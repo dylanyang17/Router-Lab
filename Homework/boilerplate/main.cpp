@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#define RIP_MAX_ENTRY 25
 
 extern bool validateIPChecksum(uint8_t *packet, size_t len);
 extern void update(bool insert, RoutingTableEntry entry);
@@ -42,6 +43,7 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dst
   // assemble
   // 为了获得 rip_len, 先填入 rip 部分:
   uint32_t rip_len = assemble(&rip, &output[20 + 8]);
+  in_addr_t srcAddr = addr[if_index];
   // IP
   ++ipTag;
   output[0]  = 0x45;
@@ -56,7 +58,7 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dst
   output[9]  = 0x11;   // 表示携带UDP协议
   output[10] = 0x00;
   output[11] = 0x00;   // 头部校验和留至填充头部完毕之后计算
-  putFourByte(output + 12, addr[if_index]);
+  putFourByte(output + 12, srcAddr);
   putFourByte(output + 16, dstAddr);
   uint16_t cksum = calcIPChecksum(output, rip_len + 20 + 8);  // IP 头部校验和
   output[10] = (cksum >> 8) & 0xFF;
@@ -72,7 +74,7 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dst
   output[25] = (rip_len + 8) & 0xFF;  // UDP长度
   output[26] = 0x00;
   output[27] = 0x00;   // 待会计算校验和
-  cksum = calcUDPChecksum(output + 20, rip_len + 8);
+  cksum = calcUDPChecksum(output + 20, rip_len + 8, srcAddr, dstAddr);
   output[26] = (cksum >> 8) & 0xFF;
   output[27] = cksum & 0xFF;
 
@@ -113,7 +115,7 @@ int main(int argc, char *argv[]) {
     uint64_t time = HAL_GetTicks();
     if (time > last_time + 30 * 1000) {
       // What to do?
-      // TODO 例行更新 进行查询？
+      // TODO 例行更新 发送rip响应？
       last_time = time;
       printf("Timer\n");
     }
@@ -155,20 +157,21 @@ int main(int argc, char *argv[]) {
     }
     // TODO: Handle rip multicast address?
     bool isMulti = (dst_addr == multicastAddr);
-    if (isMulti || dst_is_me) {  // 224.0.0.9 or me
-      // TODO: RIP?
+    if (isMulti || dst_is_me) {  
+      // 224.0.0.9 or me，进行接收处理
       RipPacket rip;
       if (disassemble(packet, res, &rip)) {
+        // 为 rip 数据报
         for (int i = 0; i < rip.numEntries; ++i) {
           // 注意可能有多组 rip 条目
           if (rip.command == 1) {
             // request
             // 请求报文必须满足 metric 为 16，注意 metric 为大端序
+            // 注意若表项数目大于 25，则需要分开发送
             uint32_t metricSmall = convertBigSmallEndian32(rip.entries[i].metric);
             if (metricSmall != 16) continue;
-            // TODO TODO 注意若表项数目大于 25，则需要分开发送
             RipPacket resp;
-            // TODO 封装响应报文，注意选择路由条目
+            // 封装响应报文，注意选择路由条目
             resp.command = 2;  // response
             for (int i = 0; i < MAXN; ++i) {
               if (enabled[i] && !isInSameNetworkSegment(table[i].addr, src_addr, table[i].len)) {
@@ -178,9 +181,16 @@ int main(int argc, char *argv[]) {
                 resp.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
                 resp.entries[id].nexthop = table[i].nexthop;
                 resp.entries[id].metric = convertBigSmallEndian32(table[i].metric);
+                if (resp.numEntries == RIP_MAX_ENTRY) {
+                  // 满 25 条，进行一次发送
+                  sendRipPacket(if_index, resp, src_addr);
+                  resp.numEntries = 0;
+                }
               }
             }
-            sendRipPacket(if_index, resp);
+            if (resp.numEntries) {
+              sendRipPacket(if_index, resp, src_addr);
+            }
           } else {
             // response
             // TODO: use query and update
