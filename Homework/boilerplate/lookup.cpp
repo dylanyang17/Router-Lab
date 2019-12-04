@@ -43,30 +43,53 @@ int findEmpty() {
   return -1;
 }
 
-/**
- * @brief 插入/删除一条路由表表项
- * @param insert 如果要插入则为 true ，要删除则为 false
+/** 注意同之前 lookup oj 测试题中的实现不同
+ * @brief 插入一条路由表表项，若 metric 为 16 则表示删除
  * @param entry 要插入/删除的表项
  * 
- * 插入时如果已经存在一条 addr 和 len 都相同的表项，则替换掉原有的。
- * 删除时按照 addr 和 len 匹配。
+ * 如果不存在一条 addr 和 len 都相同(下称同一网段)的表项，
+ * 则直接插入即可（metric需小于16）;
+ * 如果有一条同网段的表项，则判断nexthop是否相同，相同则直接
+ * 更新(metric==16表示删除)，不同则仅当新的 metric + 1 小于
+ * 原 metric 时再进行更新
+ *
+ * 有实质更新则返回 true，否则返回 false
  */
 
-void update(bool insert, RoutingTableEntry entry) {
+bool update(RoutingTableEntry entry) {
   // NOTE: 注意这里对 entry 进行了子网掩码的与操作，以保证entry的addr的主机标识为0，即仅最低 len 位可能出现非零
   entry.addr &= getMaskFromLen(entry.len);
   int ind = find(entry);
   if (ind != -1) {
-    if (insert) {
-      enabled[ind] = true;
+    // 原表项中存在该网段
+    if (table[ind].nexthop == entry.nexthop) {
+      // 首先判断来源是否相同，相同则直接更新
+      if (entry.metric == 16) {
+        // 删除表项
+        enabled[ind] = false;
+        return true;
+      } else if (entry.metric != table[ind].metric){
+        // 不删除，仅更新
+        table[ind] = entry;
+      } else {
+        // 无实质变动，返回 false
+        return false;
+      }
+    } else if (entry.metric + 1 < table[ind].metric) {
+      // 否则若新 metric + 1 < 旧 metric
       table[ind] = entry;
+      return true;
     } else {
-      enabled[ind] = false;
+      return false;
     }
-  } else if (insert) {
+  } else if (entry.metric < 16){
+    // 原表项中不存在该网段且新metric<16
     ind = findEmpty();
     table[ind] = entry;
     enabled[ind] = true;
+    return true;
+  } else {
+    return false;
   }
 }
 

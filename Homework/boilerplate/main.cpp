@@ -9,7 +9,7 @@
 #define RIP_MAX_ENTRY 25
 
 extern bool validateIPChecksum(uint8_t *packet, size_t len);
-extern void update(bool insert, RoutingTableEntry entry);
+extern void update(RoutingTableEntry entry);
 extern bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index);
 extern bool forward(uint8_t *packet, size_t len);
 extern bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output);
@@ -82,7 +82,7 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dst
   // checksum calculation for ip and udp
   // if you don't want to calculate udp checksum, set it to zero
   // send it back
-  HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, src_mac);
+  HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, srcMac);
 }
 
 int main(int argc, char *argv[]) {
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
       .metric = 1,  // small endian
       .nexthop = 0 // big endian, means direct
     };
-    update(true, entry);
+    update(entry);
   }
 
   uint64_t last_time = 0;
@@ -121,11 +121,11 @@ int main(int argc, char *argv[]) {
     }
 
     int mask = (1 << N_IFACE_ON_BOARD) - 1;
-    macaddr_t src_mac;
-    macaddr_t dst_mac;
+    macaddr_t srcMac;
+    macaddr_t dstMac;
     int if_index;
-    res = HAL_ReceiveIPPacket(mask, packet, sizeof(packet), src_mac,
-        dst_mac, 1000, &if_index);
+    res = HAL_ReceiveIPPacket(mask, packet, sizeof(packet), srcMac,
+        dstMac, 1000, &if_index);
     if (res == HAL_ERR_EOF) {
       break;
     } else if (res < 0) {
@@ -142,70 +142,74 @@ int main(int argc, char *argv[]) {
       printf("Invalid IP Checksum\n");
       continue;
     }
-    in_addr_t src_addr, dst_addr;
-    // extract src_addr and dst_addr from packet
+    in_addr_t srcAddr, dstAddr;
+    // extract srcAddr and dstAddr from packet
     // big endian
-    src_addr = getFourByte(packet + 12);
-    dst_addr = getFourByte(packet + 16);
+    srcAddr = getFourByte(packet + 12);
+    dstAddr = getFourByte(packet + 16);
 
     bool dst_is_me = false;
     for (int i = 0; i < N_IFACE_ON_BOARD;i++) {
-      if (memcmp(&dst_addr, &addrs[i], sizeof(in_addr_t)) == 0) {
+      if (memcmp(&dstAddr, &addrs[i], sizeof(in_addr_t)) == 0) {
         dst_is_me = true;
         break;
       }
     }
     // TODO: Handle rip multicast address?
-    bool isMulti = (dst_addr == multicastAddr);
+    bool isMulti = (dstAddr == multicastAddr);
     if (isMulti || dst_is_me) {  
       // 224.0.0.9 or me，进行接收处理
       RipPacket rip;
       if (disassemble(packet, res, &rip)) {
         // 为 rip 数据报
-        for (int i = 0; i < rip.numEntries; ++i) {
-          // 注意可能有多组 rip 条目
-          if (rip.command == 1) {
-            // request
-            // 请求报文必须满足 metric 为 16，注意 metric 为大端序
-            // 注意若表项数目大于 25，则需要分开发送
-            uint32_t metricSmall = convertBigSmallEndian32(rip.entries[i].metric);
-            if (metricSmall != 16) continue;
-            RipPacket resp;
-            // 封装响应报文，注意选择路由条目
-            resp.command = 2;  // response
-            for (int i = 0; i < MAXN; ++i) {
-              if (enabled[i] && !isInSameNetworkSegment(table[i].addr, src_addr, table[i].len)) {
-                // 与来源ip的网段不同
-                uint32_t id = resp.numEntries++;
-                resp.entries[id].addr = table[i].addr;
-                resp.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
-                resp.entries[id].nexthop = table[i].nexthop;
-                resp.entries[id].metric = convertBigSmallEndian32(table[i].metric);
-                if (resp.numEntries == RIP_MAX_ENTRY) {
-                  // 满 25 条，进行一次发送
-                  sendRipPacket(if_index, resp, src_addr);
-                  resp.numEntries = 0;
-                }
+        if (rip.command == 1) {
+          // request
+          // 请求报文必须满足 metric 为 16，注意 metric 为大端序
+          // 注意若表项数目大于 25，则需要分开发送
+          uint32_t metricSmall = convertBigSmallEndian32(rip.entries[0].metric);
+          if (metricSmall != 16) continue;
+          RipPacket resp;
+          // 封装响应报文，注意选择路由条目
+          resp.command = 2;  // response
+          for (int j = 0; j < MAXN; ++j) {
+            if (enabled[j] && !isInSameNetworkSegment(table[j].addr, srcAddr, table[j].len)) {
+              // 与来源ip的网段不同
+              uint32_t id = resp.numEntries++;
+              resp.entries[id].addr = table[j].addr;
+              resp.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[j].len));
+              resp.entries[id].nexthop = table[j].nexthop;
+              resp.entries[id].metric = convertBigSmallEndian32(table[j].metric);
+              if (table[j].nexthop == srcAddr) {
+                // 毒性逆转
+                resp.entries[id].metric = 16;
+              }
+              if (resp.numEntries == RIP_MAX_ENTRY) {
+                // 满 25 条，进行一次发送
+                sendRipPacket(if_index, resp, srcAddr);
+                resp.numEntries = 0;
               }
             }
-            if (resp.numEntries) {
-              sendRipPacket(if_index, resp, src_addr);
-            }
-          } else {
-            // response
-            // TODO: use query and update
+          }
+          if (resp.numEntries) {
+            sendRipPacket(if_index, resp, srcAddr);
+          }
+        } else {
+          // response
+          // TODO: use query and update
+          for (int i = 0; i < rip.numEntries; ++i) {
+            rip.entries[i].addr
           }
         }
       } else {
         // forward
         // beware of endianness
         uint32_t nexthop, dest_if;
-        if (query(src_addr, &nexthop, &dest_if)) {
+        if (query(srcAddr, &nexthop, &dest_if)) {
           // found
           macaddr_t dest_mac;
           // direct routing
           if (nexthop == 0) {
-            nexthop = dst_addr;
+            nexthop = dstAddr;
           }
           if (HAL_ArpGetMacAddress(dest_if, nexthop, dest_mac) == 0) {
             // found
