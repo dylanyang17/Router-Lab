@@ -40,7 +40,7 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip) {
   // IP
   ++ipTag;
   output[0] = 0x45;
-  output[1] = ?;
+  output[1] = ?; // TODO
   output[2] = ((rip_len + 20 + 8) >> 8) & 0xFF;
   output[3] = (rip_len + 20 + 8) & 0xFF;
   output[4] = (ipTag >> 8) & 0xFF;
