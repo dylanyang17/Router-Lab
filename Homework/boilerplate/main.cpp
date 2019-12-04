@@ -16,6 +16,7 @@ extern uint32_t assemble(const RipPacket *rip, uint8_t *buffer);
 extern uint32_t getFourByte(uint8_t *packet);
 extern void putFourByte(uint8_t *packet, uint32_t num);
 extern uint32_t convertBigSmallEndian32(uint32_t num);
+extern uint16_t calcIPChecksum(uint8_t *packet, size_t len);
 
 extern uint32_t getMaskFromLen(uint32_t len);
 extern bool isInSameNetworkSegment(in_addr_t addr1, in_addr_t addr2, uint32_t len);
@@ -56,6 +57,10 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dst
   output[11] = 0x00;   // 头部校验和留至填充头部完毕之后计算
   putFourByte(output + 12, addr[if_index]);
   putFourByte(output + 16, dstAddr);
+  uint16_t cksum = calcIPChecksum(output, rip_len + 20 + 8);  // IP 头部校验和
+  output[10] = (cksum >> 8) & 0xFF;
+  output[11] = cksum & 0xFF;
+
   // UDP
   // port = 520
   output[20] = 0x02;

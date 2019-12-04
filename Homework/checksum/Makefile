@@ -1,7 +1,7 @@
 CXX ?= g++
 LAB_ROOT ?= ../..
 BACKEND ?= STDIO
-CXXFLAGS ?= --std=c++11 -Wall -Wconversion -Wextra -I $(LAB_ROOT)/HAL/include -DROUTER_BACKEND_$(BACKEND)
+CXXFLAGS ?= --std=c++11 -I $(LAB_ROOT)/HAL/include -DROUTER_BACKEND_$(BACKEND)
 LDFLAGS ?= -lpcap
 
 .PHONY: all clean grade
@@ -19,7 +19,7 @@ grade: checksum
 hal.o: $(LAB_ROOT)/HAL/src/stdio/router_hal.cpp
 	$(CXX) $(CXXFLAGS) -c $^ -o $@
 
-checksum: checksum.o main.o hal.o
+checksum: checksum.o main.o hal.o util.o
 	$(CXX) $^ -o $@ $(LDFLAGS) 
 
 std: std.o main.o hal.o
