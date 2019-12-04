@@ -86,6 +86,16 @@ uint32_t getMaskFromLen(uint32_t len) {
   return (~((1 << (32 - len)) - 1));
 }
 
+uint32_t getLenFromMask(uint32_t mask) {
+  // 从 mask 得到其为 1 的位数，保证mask符合格式 【注意此处也为小端序】
+  int tmp = (1 << 31), ret = 0;
+  while (mask & tmp) {
+    tmp >>= 1;
+    ++ret;
+  }
+  return ret;
+}
+
 uint32_t getNetworkSegment(in_addr_t addr, uint32_t len) {
   // 计算网络标识，注意为大端序
   uint32_t mask = getMaskFromLen(len);

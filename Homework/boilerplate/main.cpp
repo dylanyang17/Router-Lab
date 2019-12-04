@@ -21,6 +21,7 @@ extern uint16_t calcIPChecksum(uint8_t *packet, size_t len);
 extern uint16_t calcUDPChecksum(uint8_t *packet, size_t len, in_addr_t srcAddr, in_addr_t dstAddr);
 
 extern uint32_t getMaskFromLen(uint32_t len);
+extern uint32_t getLenFromMask(uint32_t mask);
 extern bool isInSameNetworkSegment(in_addr_t addr1, in_addr_t addr2, uint32_t len);
 
 extern const int MAXN = 105;
@@ -37,8 +38,9 @@ uint16_t ipTag;  // ip头中的16位标识
 // 你可以按需进行修改，注意端序
 in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0100000a, 0x0101000a, 0x0102000a, 0x0103000a};
 const in_addr_t multicastAddr = 0x090000E0;  // ripv2 的组播地址 224.0.0.9
+macaddr_t multicastMac;
 
-void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dstAddr) {
+void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dstAddr, macaddr_t dstMac) {
   // 将 rip 封装 UDP 和 IP 头，并从索引为 if_index 的网络接口发送出去，发送的目的 ip 地址为dstAddr。注意 rip 报文封装之后长度不会超过以太网的 MTU
   // assemble
   // 为了获得 rip_len, 先填入 rip 部分:
@@ -82,7 +84,7 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dst
   // checksum calculation for ip and udp
   // if you don't want to calculate udp checksum, set it to zero
   // send it back
-  HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, srcMac);
+  HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, dstMac);
 }
 
 int main(int argc, char *argv[]) {
@@ -92,6 +94,7 @@ int main(int argc, char *argv[]) {
   if (res < 0) {
     return res;
   }
+  HAL_ArpGetMacAddress(0, multicastAddr, multicastMac); // 组播 ip 对应的组播 mac 地址，一定存在
 
   // Add direct routes
   // For example:
@@ -155,7 +158,6 @@ int main(int argc, char *argv[]) {
         break;
       }
     }
-    // TODO: Handle rip multicast address?
     bool isMulti = (dstAddr == multicastAddr);
     if (isMulti || dst_is_me) {  
       // 224.0.0.9 or me，进行接收处理
@@ -171,13 +173,14 @@ int main(int argc, char *argv[]) {
           RipPacket resp;
           // 封装响应报文，注意选择路由条目
           resp.command = 2;  // response
+          resp.numEntries = 0;
           for (int j = 0; j < MAXN; ++j) {
             if (enabled[j] && !isInSameNetworkSegment(table[j].addr, srcAddr, table[j].len)) {
               // 与来源ip的网段不同
               uint32_t id = resp.numEntries++;
               resp.entries[id].addr = table[j].addr;
               resp.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[j].len));
-              resp.entries[id].nexthop = table[j].nexthop;
+              resp.entries[id].nexthop = 0;
               resp.entries[id].metric = convertBigSmallEndian32(table[j].metric);
               if (table[j].nexthop == srcAddr) {
                 // 毒性逆转
@@ -185,19 +188,45 @@ int main(int argc, char *argv[]) {
               }
               if (resp.numEntries == RIP_MAX_ENTRY) {
                 // 满 25 条，进行一次发送
-                sendRipPacket(if_index, resp, srcAddr);
+                sendRipPacket(if_index, resp, srcAddr, srcMac);
                 resp.numEntries = 0;
               }
             }
           }
           if (resp.numEntries) {
-            sendRipPacket(if_index, resp, srcAddr);
+            sendRipPacket(if_index, resp, srcAddr, srcMac);
           }
         } else {
           // response
-          // TODO: use query and update
+          RipPacket upd;
+          upd.numEntries = 0;
+          upd.command = 2;
           for (int i = 0; i < rip.numEntries; ++i) {
-            rip.entries[i].addr
+            RoutingTableEntry entry;
+            entry.addr = rip.entries[i].addr;
+            entry.len  = getLenFromMask(convertBigSmallEndian32(rip.entries[i].mask));
+            entry.if_index = if_index;
+            entry.metric = convertBigSmallEndian32(rip.entries[i].metric);
+            entry.nexthop = srcAddr;
+            bool suc = update(entry);
+            if (suc) {
+              // 若更新路由表成功，触发更新
+              uint32_t id = upd.numEntries++;
+              upd.entries[id] = rip;
+              upd.entries[id].nexthop = 0;
+              upd.entries[id].metric = std::min(entry.metric + 1, 16);
+            }
+          }
+          if (upd.numEntries) {
+            for (int i = 0; i < N_IFACE_ON_BOARD; ++i) {
+              macaddr_t mac;
+              RipPacket resp = udp;
+              for (int j = 0; j < resp.numEntries; ++j) {
+                // TODO  毒性逆转
+                // if (resp.entries[j].nexthop )
+              }
+              sendRipPacket(i, resp, multicastAddr, multicastMac);
+            }
           }
         }
       } else {

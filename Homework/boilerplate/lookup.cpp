@@ -20,6 +20,8 @@ typedef struct {
    保证 addr 仅最低 len 位可能出现非零。
    当 nexthop 为零时这是一条直连路由。
    你可以在全局变量中把路由表以一定的数据结构格式保存下来。
+
+   注意 nexthop 可能为 0.0.0.0，这样可以保证不被更新，表示直连
  */
 
 extern uint32_t convertBigSmallEndian32(uint32_t num);
