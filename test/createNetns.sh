@@ -15,3 +15,6 @@ ip netns exec net1 ip link set veth-1r up
 ip netns exec net2 ip link set veth-2l up
 ip netns exec net2 ip link set veth-2r up
 ip netns exec net3 ip link set veth-3l up
+ip netns exec net1 ip link set lo up
+ip netns exec net2 ip link set lo up
+ip netns exec net3 ip link set lo up       # 开启回环设备
