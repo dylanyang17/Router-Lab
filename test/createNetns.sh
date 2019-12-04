@@ -18,3 +18,8 @@ ip netns exec net3 ip link set veth-3l up
 ip netns exec net1 ip link set lo up
 ip netns exec net2 ip link set lo up
 ip netns exec net3 ip link set lo up       # 开启回环设备
+
+ip netns exec net1 ethtool -K veth-1r tx off
+ip netns exec net2 ethtool -K veth-2l tx off
+ip netns exec net2 ethtool -K veth-2r tx off
+ip netns exec net3 ethtool -K veth-3l tx off  # 关闭checksum offload，这样抓包得到的checksum才正确

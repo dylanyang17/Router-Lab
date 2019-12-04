@@ -37,11 +37,6 @@ bool checkMask(uint32_t mask) {
   return (i == -1 || (mask & ((1 << i) - 1)) == 0);
 }
 
-bool isMulticastAddress(const in_addr_t &addr) {
-  // 判断是否为 ripv2 组播地址 224.0.0.9
-  return addr == 0x090000E0;
-}
-
 uint32_t getMaskFromLen(uint32_t len) {
   // 从子网掩码长度生成小端序的子网掩码【注意此处为小端序，主要是便于计算】
   return (~((1 << (32 - len)) - 1));

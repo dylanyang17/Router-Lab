@@ -14,9 +14,9 @@ extern bool forward(uint8_t *packet, size_t len);
 extern bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output);
 extern uint32_t assemble(const RipPacket *rip, uint8_t *buffer);
 extern uint32_t getFourByte(uint8_t *packet);
+extern void putFourByte(uint8_t *packet, uint32_t num);
 extern uint32_t convertBigSmallEndian32(uint32_t num);
 
-extern bool isMulticastAddress(const in_addr_t &addr);
 extern uint32_t getMaskFromLen(uint32_t len);
 extern bool isInSameNetworkSegment(in_addr_t addr1, in_addr_t addr2, uint32_t len);
 
@@ -33,25 +33,38 @@ uint16_t ipTag;  // ip头中的16位标识
 // 3: 10.0.3.1
 // 你可以按需进行修改，注意端序
 in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0100000a, 0x0101000a, 0x0102000a, 0x0103000a};
+const in_addr_t multicastAddr = 0x090000E0;  // ripv2 的组播地址 224.0.0.9
 
-void sendRipPacket(const uint32_t &if_index, const RipPacket &rip) {
-  // 将 rip 封装 UDP 和 IP 头，并从索引为 if_index 的网络接口发送出去
+void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dstAddr) {
+  // 将 rip 封装 UDP 和 IP 头，并从索引为 if_index 的网络接口发送出去，发送的目的 ip 地址为dstAddr。注意 rip 报文封装之后长度不会超过以太网的 MTU
   // assemble
+  // 为了获得 rip_len, 先填入 rip 部分:
+  uint32_t rip_len = assemble(&rip, &output[20 + 8]);
   // IP
   ++ipTag;
-  output[0] = 0x45;
-  output[1] = ?; // TODO
-  output[2] = ((rip_len + 20 + 8) >> 8) & 0xFF;
-  output[3] = (rip_len + 20 + 8) & 0xFF;
-  output[4] = (ipTag >> 8) & 0xFF;
-  output[5] = ipTag & 0xFF;
+  output[0]  = 0x45;
+  output[1]  = 0xC0; // 此处设置为同抓包得到的相同，表示网间控制的一般服务
+  output[2]  = ((rip_len + 20 + 8) >> 8) & 0xFF;
+  output[3]  = (rip_len + 20 + 8) & 0xFF;
+  output[4]  = (ipTag >> 8) & 0xFF;  // IP 长度
+  output[5]  = ipTag & 0xFF;
+  output[6]  = 0x00;   // 不用考虑分片
+  output[7]  = 0x00;
+  output[8]  = 0x01;   // TTL为1，因为只向邻居发送rip报文
+  output[9]  = 0x11;   // 表示携带UDP协议
+  output[10] = 0x00;
+  output[11] = 0x00;   // 头部校验和留至填充头部完毕之后计算
+  putFourByte(output + 12, addr[if_index]);
+  putFourByte(output + 16, dstAddr);
   // UDP
   // port = 520
   output[20] = 0x02;
-  output[21] = 0x08;
-  // ...
-  // RIP
-  uint32_t rip_len = assemble(&rip, &output[20 + 8]);
+  output[21] = 0x08;   // 源端口为 520
+  output[22] = 0x02;
+  output[23] = 0x08;   // 目的端口为 520
+  output[24] = ((rip_len + 8) >> 8) & 0xFF;
+  output[25] = (rip_len + 8) & 0xFF;  // UDP长度
+  // RIP 在上面已经填过了
   // checksum calculation for ip and udp
   // if you don't want to calculate udp checksum, set it to zero
   // send it back
@@ -129,7 +142,7 @@ int main(int argc, char *argv[]) {
       }
     }
     // TODO: Handle rip multicast address?
-    bool isMulti = isMulticastAddress(dst_addr);
+    bool isMulti = (dst_addr == multicastAddr);
     if (isMulti || dst_is_me) {  // 224.0.0.9 or me
       // TODO: RIP?
       RipPacket rip;
