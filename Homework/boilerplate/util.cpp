@@ -33,6 +33,7 @@ uint16_t calcIPChecksum(uint8_t *packet, size_t len) {
 
 uint16_t calcUDPChecksum(uint8_t *packet, size_t len, in_addr_t srcAddr, in_addr_t dstAddr) {
   // 计算 packet 的 udp 首部校验和（packet起始便为UDP头），len 为 UDP 包长度
+  // 源ip和目的ip分别为srcAddr和dstAddr，目的是作为伪首部计算校验和
   uint32_t sum = 0;
   // 伪首部
   cycleSum(sum, (uint16_t)(srcAddr >> 16));
@@ -43,6 +44,7 @@ uint16_t calcUDPChecksum(uint8_t *packet, size_t len, in_addr_t srcAddr, in_addr
   cycleSum(sum, (uint16_t)len);
   // 首部+数据，**注意奇数字节时相当于往末尾填零**
   for (int i = 0; i < len; i += 2) {
+    if (i==6) continue;
     uint16_t tmp = ((uint16_t)packet[i] << 8);
     if (i + 1 < len) {
       tmp += packet[i + 1];

@@ -17,6 +17,7 @@ extern uint32_t getFourByte(uint8_t *packet);
 extern void putFourByte(uint8_t *packet, uint32_t num);
 extern uint32_t convertBigSmallEndian32(uint32_t num);
 extern uint16_t calcIPChecksum(uint8_t *packet, size_t len);
+extern uint16_t calcUDPChecksum(uint8_t *packet, size_t len, in_addr_t srcAddr, in_addr_t dstAddr);
 
 extern uint32_t getMaskFromLen(uint32_t len);
 extern bool isInSameNetworkSegment(in_addr_t addr1, in_addr_t addr2, uint32_t len);
@@ -69,6 +70,12 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dst
   output[23] = 0x08;   // 目的端口为 520
   output[24] = ((rip_len + 8) >> 8) & 0xFF;
   output[25] = (rip_len + 8) & 0xFF;  // UDP长度
+  output[26] = 0x00;
+  output[27] = 0x00;   // 待会计算校验和
+  cksum = calcUDPChecksum(output + 20, rip_len + 8);
+  output[26] = (cksum >> 8) & 0xFF;
+  output[27] = cksum & 0xFF;
+
   // RIP 在上面已经填过了
   // checksum calculation for ip and udp
   // if you don't want to calculate udp checksum, set it to zero
