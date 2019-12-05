@@ -157,31 +157,35 @@ int main(int argc, char *argv[]) {
   }
 
   uint64_t last_time = 0;
+  int updCnt = 0;  // 每计6次（5*6 = 30s）进行一次更新
   while (1) {
     uint64_t time = HAL_GetTicks();
     if (time > last_time + 5 * 1000) {
       // 例行更新
-      RipPacket upd;
-      upd.command = 2;
-      upd.numEntries = 0;
-      for (int i = 0; i < MAXN; ++i) {
-        if (enabled[i]) {
-          uint32_t id = upd.numEntries++;
-          upd.entries[id].addr = table[i].addr;
-          upd.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
-          upd.entries[id].nexthop = 0;
-          upd.entries[id].metric = convertBigSmallEndian32(table[i].metric);
-          if (upd.numEntries == RIP_MAX_ENTRY) {
-            sendRipUpdate(upd);
-            upd.numEntries = 0;
+      if (++updCnt == 6) {
+        fprintf(stderr, "Timer Fired: Send update\n");
+        updCnt = 0;
+        RipPacket upd;
+        upd.command = 2;
+        upd.numEntries = 0;
+        for (int i = 0; i < MAXN; ++i) {
+          if (enabled[i]) {
+            uint32_t id = upd.numEntries++;
+            upd.entries[id].addr = table[i].addr;
+            upd.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
+            upd.entries[id].nexthop = 0;
+            upd.entries[id].metric = convertBigSmallEndian32(table[i].metric);
+            if (upd.numEntries == RIP_MAX_ENTRY) {
+              sendRipUpdate(upd);
+              upd.numEntries = 0;
+            }
           }
         }
-      }
-      if (upd.numEntries) {
-        sendRipUpdate(upd);
+        if (upd.numEntries) {
+          sendRipUpdate(upd);
+        }
       }
       last_time = time;
-      printf("Timer Fired: Update\n");
       printRouteTable(stderr);
     }
 
