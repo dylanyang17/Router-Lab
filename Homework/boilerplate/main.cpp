@@ -121,7 +121,7 @@ void sendRipUpdate(const RipPacket &upd) {
       if (!isInSameNetworkSegment(upd.entries[j].addr, addrs[i], len)) {
         uint32_t id = resp.numEntries++;
         resp.entries[id] = upd.entries[j];
-        if (isInSameNetworkSegment(resp.entries[id].nexthop, addrs[i], len)) {
+        if (isInSameNetworkSegment(table[resp.entries[id].localTableInd].nexthop, addrs[i], len)) {
           resp.entries[id].metric = convertBigSmallEndian32(16);
         }
       }
@@ -181,6 +181,7 @@ int main(int argc, char *argv[]) {
             upd.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
             upd.entries[id].nexthop = 0;
             upd.entries[id].metric = convertBigSmallEndian32(table[i].metric);
+            upd.entries[id].localTableInd = i;
             if (table[i].nexthop != 0 && (double)(time - table[i].timestamp) / TICKS_PER_SEC > TIMEOUT) {
               // 非直连，且路由表项超时，这里采取简单的做法，直接发出报文——一个更好的做法是等待一段时间之后未被更新再发出报文
               upd.entries[id].metric = convertBigSmallEndian32(16);
@@ -263,9 +264,9 @@ int main(int argc, char *argv[]) {
               resp.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[j].len));
               resp.entries[id].nexthop = 0;
               resp.entries[id].metric = convertBigSmallEndian32(table[j].metric);
-              if (table[j].nexthop == srcAddr) {
+              if (isInSameNetworkSegment(table[j].nexthop, addrs[if_index], table[j].len)) {
                 // 毒性逆转
-                resp.entries[id].metric = 16;
+                resp.entries[id].metric = convertBigSmallEndian32(16);
               }
               if (resp.numEntries == RIP_MAX_ENTRY) {
                 // 满 25 条，进行一次发送
@@ -300,6 +301,7 @@ int main(int argc, char *argv[]) {
               upd.entries[id] = rip.entries[i];
               upd.entries[id].nexthop = 0;
               upd.entries[id].metric = convertBigSmallEndian32(entry.metric);
+              upd.entries[id].localTableInd = i;
             }
           }
           if (upd.numEntries) {
