@@ -28,8 +28,9 @@ extern const int MAXN = 105;
 extern RoutingTableEntry table[MAXN];
 extern bool enabled[MAXN];
 
-extern void printAddr(const in_addr_t &addr);
-extern void printRouteEntry(const RoutingTableEntry &entry);
+extern void printAddr(const in_addr_t &addr, FILE *file);
+extern void printRouteEntry(const RoutingTableEntry &entry, FILE *file);
+extern void printRouteTable(FILE *file);
 
 uint8_t packet[2048];
 uint8_t output[2048];
@@ -128,7 +129,7 @@ void sendRipUpdate(const RipPacket &upd) {
 }
 
 int main(int argc, char *argv[]) {
-  // freopen("out", "w", stdout);
+  freopen("nul", "w", stdout);
   srand(time(NULL));
   ipTag = (uint32_t)rand();
   int res = HAL_Init(1, addrs);
@@ -181,16 +182,15 @@ int main(int argc, char *argv[]) {
       }
       last_time = time;
       printf("Timer Fired: Update\n");
+      printRouteTable(stderr);
     }
 
     int mask = (1 << N_IFACE_ON_BOARD) - 1;
     macaddr_t srcMac;
     macaddr_t dstMac;
     int if_index;
-    printf("TTT0:%d\n", clock());
     res = HAL_ReceiveIPPacket(mask, packet, sizeof(packet), srcMac,
         dstMac, 1000, &if_index);
-    printf("TTT1:%d\n", clock());
     if (res == HAL_ERR_EOF) {
       break;
     } else if (res < 0) {
@@ -279,7 +279,7 @@ int main(int argc, char *argv[]) {
             if (suc) {
               // 若更新路由表成功，触发更新
               printf("%d:: Update router successfully.", messageId);
-              printRouteEntry(entry);
+              printRouteEntry(entry, stdout);
               uint32_t id = upd.numEntries++;
               upd.entries[id] = rip.entries[i];
               upd.entries[id].nexthop = 0;
@@ -314,7 +314,7 @@ int main(int argc, char *argv[]) {
           if (output[8] != 0) {
             HAL_SendIPPacket(dest_if, output, res, dest_mac);
             printf("%d:: Forward successfully. dest_if: %d  Nexthop:", messageId, dest_if);
-            printAddr(nexthop);
+            printAddr(nexthop, stdout);
             printf("\n");
           } else {
             // ttl == 0
@@ -323,7 +323,7 @@ int main(int argc, char *argv[]) {
         } else {
           // not found
           printf("%d:: Failed to get mac address. dest_if: %d Nexthop:", messageId, dest_if);
-          printAddr(nexthop);
+          printAddr(nexthop, stdout);
           printf("\n");
         }
       } else {
