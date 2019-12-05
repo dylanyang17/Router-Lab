@@ -55,9 +55,6 @@ void sendRipPacketByHAL(const uint32_t &if_index, const RipPacket &rip, in_addr_
   // 将 rip 封装 UDP 和 IP 头，并从索引为 if_index 的网络接口发送出去，发送的目的 ip 地址为dstAddr。注意 rip 报文封装之后长度不会超过以太网的 MTU
   // assemble
   // 为了获得 rip_len, 先填入 rip 部分:
-  printf("TTT\n");
-  printAddr(rip.entries[0].addr);
-  printf("TTT\n");
   uint32_t rip_len = assemble(&rip, &output[20 + 8]);
   in_addr_t srcAddr = addrs[if_index];
   // IP
@@ -292,31 +289,44 @@ int main(int argc, char *argv[]) {
           }
         }
       } else {
-        // forward
-        // beware of endianness
-        uint32_t nexthop, dest_if;
-        if (query(srcAddr, &nexthop, &dest_if)) {
+        // Target is me but not rip.
+      }
+    } else {
+      // forward
+      // beware of endianness
+      printf("%d:: Forward.\n", messageId);
+      uint32_t nexthop, dest_if;
+      if (query(dstAddr, &nexthop, &dest_if)) {
+        // found
+        macaddr_t dest_mac;
+        // direct routing
+        if (nexthop == 0) {
+          nexthop = dstAddr;
+        }
+        if (HAL_ArpGetMacAddress(dest_if, nexthop, dest_mac) == 0) {
           // found
-          macaddr_t dest_mac;
-          // direct routing
-          if (nexthop == 0) {
-            nexthop = dstAddr;
-          }
-          if (HAL_ArpGetMacAddress(dest_if, nexthop, dest_mac) == 0) {
-            // found
-            memcpy(output, packet, res);
-            // update ttl and checksum
-            forward(output, res);
-            // check ttl!=0
-            if (output[8] != 0) {
-              HAL_SendIPPacket(dest_if, output, res, dest_mac);
-            }
+          memcpy(output, packet, res);
+          // update ttl and checksum
+          forward(output, res);
+          // check ttl!=0
+          if (output[8] != 0) {
+            HAL_SendIPPacket(dest_if, output, res, dest_mac);
+            printf("%d:: Forward successfully. dest_if: %d  Nexthop:", messageId, dest_if);
+            printAddr(nexthop);
+            printf("\n");
           } else {
-            // not found
+            // ttl == 0
+            printf("%d:: TTL is 0.\n", messageId);
           }
         } else {
           // not found
+          printf("%d:: Failed to get mac address. dest_if: %d Nexthop:", messageId, dest_if);
+          printAddr(nexthop);
+          printf("\n");
         }
+      } else {
+        // not found
+        printf("%d:: No matching item in table.\n", messageId);
       }
     }
   }
