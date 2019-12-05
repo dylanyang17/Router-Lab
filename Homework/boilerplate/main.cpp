@@ -55,6 +55,9 @@ void sendRipPacketByHAL(const uint32_t &if_index, const RipPacket &rip, in_addr_
   // 将 rip 封装 UDP 和 IP 头，并从索引为 if_index 的网络接口发送出去，发送的目的 ip 地址为dstAddr。注意 rip 报文封装之后长度不会超过以太网的 MTU
   // assemble
   // 为了获得 rip_len, 先填入 rip 部分:
+  printf("TTT\n");
+  printAddr(rip.entries[0].addr);
+  printf("TTT\n");
   uint32_t rip_len = assemble(&rip, &output[20 + 8]);
   in_addr_t srcAddr = addrs[if_index];
   // IP

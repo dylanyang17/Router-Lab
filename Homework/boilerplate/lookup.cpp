@@ -60,7 +60,7 @@ int findEmpty() {
 
 bool update(RoutingTableEntry entry) {
   // NOTE: 注意这里对 entry 进行了子网掩码的与操作，以保证entry的addr的主机标识为0，即仅最低 len 位可能出现非零
-  entry.addr &= getMaskFromLen(entry.len);
+  entry.addr &= convertBigSmallEndian32(getMaskFromLen(entry.len));
   int ind = find(entry);
   if (ind != -1) {
     // 原表项中存在该网段
