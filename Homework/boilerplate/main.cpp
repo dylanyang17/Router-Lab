@@ -187,8 +187,10 @@ int main(int argc, char *argv[]) {
     macaddr_t srcMac;
     macaddr_t dstMac;
     int if_index;
+    printf("TTT0:%d\n", clock());
     res = HAL_ReceiveIPPacket(mask, packet, sizeof(packet), srcMac,
         dstMac, 1000, &if_index);
+    printf("TTT1:%d\n", clock());
     if (res == HAL_ERR_EOF) {
       break;
     } else if (res < 0) {
