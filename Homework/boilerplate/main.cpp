@@ -40,7 +40,7 @@ in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0100000a, 0x0101000a, 0x0102000a, 0x01030
 const in_addr_t multicastAddr = 0x090000E0;  // ripv2 的组播地址 224.0.0.9
 macaddr_t multicastMac;
 
-void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dstAddr, macaddr_t dstMac) {
+void sendRipPacketByHAL(const uint32_t &if_index, const RipPacket &rip, in_addr_t dstAddr, macaddr_t dstMac) {
   // 将 rip 封装 UDP 和 IP 头，并从索引为 if_index 的网络接口发送出去，发送的目的 ip 地址为dstAddr。注意 rip 报文封装之后长度不会超过以太网的 MTU
   // assemble
   // 为了获得 rip_len, 先填入 rip 部分:
@@ -87,6 +87,33 @@ void sendRipPacket(const uint32_t &if_index, const RipPacket &rip, in_addr_t dst
   HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, dstMac);
 }
 
+void sendRipUpdate(const RipPacket &upd) {
+  // 向各个网口发送 rip 更新报文，更新报文从 upd 计算得到
+  // 注意计算时滤掉 addr 与出接口在同一网段的，并且对于
+  // nexthop 与出接口在同一网段的，发送的 metric 设为 16（毒逆）
+  // NOTE: 这样的毒逆默认了路由器不会在同一接口上进行转发
+  // 也就是说默认同一网段可互达
+  RipPacket resp;
+  for (int i = 0; i < N_IFACE_ON_BOARD; ++i) {
+    macaddr_t mac;
+    resp.numEntries = 0;
+    resp.command = 2;
+    for (int j = 0; j < upd.numEntries; ++j) {
+      // 毒性逆转
+      if (!isInSameNetworkSegment(upd.entries[j].addr, addrs[i])) {
+        uint32_t id = resp.numEntries++;
+        resp.entries[id] = upd.entries[j];
+        if (isInSameNetworkSegment(resp.entries[id].nexthop, addrs[i])) {
+          resp.entries[id].metric = convertBigSmallEndian32(16);
+        }
+      }
+    }
+    if (resp.numEntries) {
+      sendRipPacketByHAL(i, resp, multicastAddr, multicastMac);
+    }
+  }
+}
+
 int main(int argc, char *argv[]) {
   srand(time(NULL));
   ipTag = (uint32_t)rand();
@@ -117,8 +144,26 @@ int main(int argc, char *argv[]) {
   while (1) {
     uint64_t time = HAL_GetTicks();
     if (time > last_time + 30 * 1000) {
-      // What to do?
-      // TODO 例行更新 发送rip响应？
+      // 例行更新
+      RipPacket upd;
+      upd.command = 2;
+      upd.numEntries = 0;
+      for (int i = 0; i < MAXN; ++i) {
+        if (enabled[i]) {
+          uint32_t id = upd.numEntries++;
+          upd.entries[id].addr = table[i].addr;
+          upd.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
+          upd.entries[id].nexthop = 0;
+          upd.entries[id].metric = convertBigSmallEndian32(table[i].metric);
+          if (upd.numEntries == RIP_MAX_ENTRY) {
+            sendRipUpdate(upd);
+            upd.numEntries = 0;
+          }
+        }
+      }
+      if (upd.numEntries) {
+        sendRipUpdate(upd);
+      }
       last_time = time;
       printf("Timer\n");
     }
@@ -188,13 +233,13 @@ int main(int argc, char *argv[]) {
               }
               if (resp.numEntries == RIP_MAX_ENTRY) {
                 // 满 25 条，进行一次发送
-                sendRipPacket(if_index, resp, srcAddr, srcMac);
+                sendRipPacketByHAL(if_index, resp, srcAddr, srcMac);
                 resp.numEntries = 0;
               }
             }
           }
           if (resp.numEntries) {
-            sendRipPacket(if_index, resp, srcAddr, srcMac);
+            sendRipPacketByHAL(if_index, resp, srcAddr, srcMac);
           }
         } else {
           // response
@@ -212,21 +257,13 @@ int main(int argc, char *argv[]) {
             if (suc) {
               // 若更新路由表成功，触发更新
               uint32_t id = upd.numEntries++;
-              upd.entries[id] = rip;
+              upd.entries[id] = rip.entries[i];
               upd.entries[id].nexthop = 0;
-              upd.entries[id].metric = std::min(entry.metric + 1, 16);
+              upd.entries[id].metric = convertBigSmallEndian32(entry.metric);
             }
           }
           if (upd.numEntries) {
-            for (int i = 0; i < N_IFACE_ON_BOARD; ++i) {
-              macaddr_t mac;
-              RipPacket resp = udp;
-              for (int j = 0; j < resp.numEntries; ++j) {
-                // TODO  毒性逆转
-                // if (resp.entries[j].nexthop )
-              }
-              sendRipPacket(i, resp, multicastAddr, multicastMac);
-            }
+            sendRipUpdate(upd);
           }
         }
       } else {
@@ -245,8 +282,10 @@ int main(int argc, char *argv[]) {
             memcpy(output, packet, res);
             // update ttl and checksum
             forward(output, res);
-            // TODO: you might want to check ttl=0 case
-            HAL_SendIPPacket(dest_if, output, res, dest_mac);
+            // check ttl!=0
+            if (output[8] != 0) {
+              HAL_SendIPPacket(dest_if, output, res, dest_mac);
+            }
           } else {
             // not found
           }
