@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include "router_hal.h"
+#include "router.h"
 
 uint32_t convertBigSmallEndian32(uint32_t num) {
   return (((num >> 0) & 0xFF) << 24) |
@@ -110,4 +111,18 @@ bool isInSameNetworkSegment(in_addr_t addr1, in_addr_t addr2, uint32_t len) {
   addr2 = convertBigSmallEndian32(addr2);
   uint32_t mask = getMaskFromLen(len);
   return (addr1 & mask) == (addr2 & mask);
+}
+
+void printAddr(const in_addr_t &addr) {
+  // 按照 ***.***.***.***/** 的格式输出地址
+  printf("%d.%d.%d.%d",(addr) & 0xFF,
+      (addr>>8) & 0xFF, (addr>>16) & 0xFF, (addr>>24) & 0xFF);
+}
+
+void printRouteEntry(const RoutingTableEntry &entry) {
+  printf("Addr: "); printAddr(entry.addr); printf("/%d", entry.len);
+  printf("  if_index: %d", entry.if_index);
+  printf("  metric: %d", entry.metric);
+  printf("  nexthop:"); printAddr(entry.nexthop);
+  printf("\n");
 }

@@ -28,6 +28,9 @@ extern const int MAXN = 105;
 extern RoutingTableEntry table[MAXN];
 extern bool enabled[MAXN];
 
+extern void printAddr(const in_addr_t &addr);
+extern void printRouteEntry(const RoutingTableEntry &entry);
+
 uint8_t packet[2048];
 uint8_t output[2048];
 uint16_t ipTag;  // ip头中的16位标识
@@ -101,6 +104,7 @@ void sendRipUpdate(const RipPacket &upd) {
   // nexthop 与出接口在同一网段的，发送的 metric 设为 16（毒逆）
   // NOTE: 这样的毒逆默认了路由器不会在同一接口上进行转发
   // 也就是说默认同一网段可互达
+  printf("sendRipUpdate\n");
   RipPacket resp;
   for (int i = 0; i < N_IFACE_ON_BOARD; ++i) {
     macaddr_t mac;
@@ -128,6 +132,7 @@ int main(int argc, char *argv[]) {
   srand(time(NULL));
   ipTag = (uint32_t)rand();
   int res = HAL_Init(1, addrs);
+  int messageId = 0;  // for debug
   if (res < 0) {
     return res;
   }
@@ -153,7 +158,6 @@ int main(int argc, char *argv[]) {
   uint64_t last_time = 0;
   while (1) {
     uint64_t time = HAL_GetTicks();
-    printf("%lld\n", (long long)time);
     if (time > last_time + 5 * 1000) {
       // 例行更新
       RipPacket upd;
@@ -176,17 +180,15 @@ int main(int argc, char *argv[]) {
         sendRipUpdate(upd);
       }
       last_time = time;
-      printf("Timer\n");
+      printf("Timer Fired: Update\n");
     }
 
     int mask = (1 << N_IFACE_ON_BOARD) - 1;
     macaddr_t srcMac;
     macaddr_t dstMac;
     int if_index;
-    printf("Trying to receive...\n");
     res = HAL_ReceiveIPPacket(mask, packet, sizeof(packet), srcMac,
         dstMac, 1000, &if_index);
-    printf("Received successfully. res: %d", res);
     if (res == HAL_ERR_EOF) {
       break;
     } else if (res < 0) {
@@ -198,9 +200,11 @@ int main(int argc, char *argv[]) {
       // packet is truncated, ignore it
       continue;
     }
+    ++messageId;
+    printf("%d:: Valid Message. res: %d\n", messageId, res);
 
     if (!validateIPChecksum(packet, res)) {
-      printf("Invalid IP Checksum\n");
+      printf("%d:: Invalid IP Checksum\n", messageId);
       continue;
     }
     in_addr_t srcAddr, dstAddr;
@@ -219,6 +223,7 @@ int main(int argc, char *argv[]) {
     bool isMulti = (dstAddr == multicastAddr);
     if (isMulti || dst_is_me) {  
       // 224.0.0.9 or me，进行接收处理
+      printf("%d:: Dst is me or multicast.\n", messageId);
       RipPacket rip;
       if (disassemble(packet, res, &rip)) {
         // 为 rip 数据报
@@ -226,6 +231,7 @@ int main(int argc, char *argv[]) {
           // request
           // 请求报文必须满足 metric 为 16，注意 metric 为大端序
           // 注意若表项数目大于 25，则需要分开发送
+          printf("%d:: Received rip request.\n", messageId);
           uint32_t metricSmall = convertBigSmallEndian32(rip.entries[0].metric);
           if (metricSmall != 16) continue;
           RipPacket resp;
@@ -256,6 +262,7 @@ int main(int argc, char *argv[]) {
           }
         } else {
           // response
+          printf("%d:: Received rip response.\n", messageId);
           RipPacket upd;
           upd.numEntries = 0;
           upd.command = 2;
@@ -269,6 +276,8 @@ int main(int argc, char *argv[]) {
             bool suc = update(entry);
             if (suc) {
               // 若更新路由表成功，触发更新
+              printf("%d:: Update router successfully.", messageId);
+              printRouteEntry(entry);
               uint32_t id = upd.numEntries++;
               upd.entries[id] = rip.entries[i];
               upd.entries[id].nexthop = 0;
