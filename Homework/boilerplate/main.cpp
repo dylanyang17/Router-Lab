@@ -7,8 +7,10 @@
 #include <string.h>
 #include <time.h>
 #define RIP_MAX_ENTRY 25
+#define TICKS_PER_SEC 1000
 #define TIMEOUT 60
 // TODO 暂定为 60s 超时
+// 注意1s有1000个TICKS
 
 extern bool validateIPChecksum(uint8_t *packet, size_t len);
 extern bool update(RoutingTableEntry entry);
@@ -32,7 +34,7 @@ extern bool enabled[MAXN];
 
 extern void printAddr(const in_addr_t &addr, FILE *file);
 extern void printRouteEntry(const RoutingTableEntry &entry, FILE *file);
-extern void printRouteTable(FILE *file);
+extern void printRouteTable(uint64_t time, FILE *file);
 
 uint8_t packet[2048];
 uint8_t output[2048];
@@ -163,7 +165,7 @@ int main(int argc, char *argv[]) {
   int updCnt = 0;  // 每计6次（5*6 = 30s）进行一次更新
   while (1) {
     uint64_t time = HAL_GetTicks();
-    if (time > last_time + 5 * 1000) {
+    if (time > last_time + 5 * TICKS_PER_SEC) {
       // 例行更新
       // 发出响应报文之前记得确认timestamp
       if (++updCnt == 6) {
@@ -179,9 +181,9 @@ int main(int argc, char *argv[]) {
             upd.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
             upd.entries[id].nexthop = 0;
             upd.entries[id].metric = convertBigSmallEndian32(table[i].metric);
-            if ((double)(time - table[i].timestamp) / CLOCKS_PER_SEC > TIMEOUT) {
-              // 路由表项超时，这里采取简单的做法，直接发出报文——一个更好的做法是等待一段时间之后未被更新再发出报文
-              upd.entries[id].metric = 16;
+            if (table[i].nexthop != 0 && (double)(time - table[i].timestamp) / TICKS_PER_SEC > TIMEOUT) {
+              // 非直连，且路由表项超时，这里采取简单的做法，直接发出报文——一个更好的做法是等待一段时间之后未被更新再发出报文
+              upd.entries[id].metric = convertBigSmallEndian32(16);
               enabled[i] = false;
             }
             if (upd.numEntries == RIP_MAX_ENTRY) {
@@ -195,7 +197,7 @@ int main(int argc, char *argv[]) {
         }
       }
       last_time = time;
-      printRouteTable(stderr);
+      printRouteTable(time, stderr);
     }
 
     int mask = (1 << N_IFACE_ON_BOARD) - 1;

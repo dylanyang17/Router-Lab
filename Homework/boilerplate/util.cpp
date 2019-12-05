@@ -130,11 +130,12 @@ void printRouteEntry(const RoutingTableEntry &entry, FILE *file) {
   fprintf(file, "  if_index: %d", entry.if_index);
   fprintf(file, "  metric: %d", entry.metric);
   fprintf(file, "  nexthop:"); printAddr(entry.nexthop, file);
+  fprintf(file, "  timestamp: %lld:", entry.timestamp);
   fprintf(file, "\n");
 }
 
-void printRouteTable(FILE *file) {
-  fprintf(file, "\nPrinting table...\n");
+void printRouteTable(uint64_t time, FILE *file) {
+  fprintf(file, "\nPrinting table... now: %lld\n", time);
   for(int i = 0; i < MAXN; ++i) {
     if (enabled[i]) {
       printRouteEntry(table[i], file);
