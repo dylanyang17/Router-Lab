@@ -1,3 +1,2 @@
-bash compile.sh
-cd ../../test
+cd ../../test/test2
 bash runMyTest.sh
