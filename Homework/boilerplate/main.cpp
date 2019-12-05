@@ -7,6 +7,8 @@
 #include <string.h>
 #include <time.h>
 #define RIP_MAX_ENTRY 25
+#define TIMEOUT 60
+// TODO 暂定为 60s 超时
 
 extern bool validateIPChecksum(uint8_t *packet, size_t len);
 extern bool update(RoutingTableEntry entry);
@@ -151,6 +153,7 @@ int main(int argc, char *argv[]) {
       .len = 24, // small endian
       .if_index = i, // small endian
       .metric = 1,  // small endian
+      .timestamp = 0,  // small endian  直连网络不需要timestamp
       .nexthop = 0 // big endian, means direct
     };
     update(entry);
@@ -162,6 +165,7 @@ int main(int argc, char *argv[]) {
     uint64_t time = HAL_GetTicks();
     if (time > last_time + 5 * 1000) {
       // 例行更新
+      // 发出响应报文之前记得确认timestamp
       if (++updCnt == 6) {
         fprintf(stderr, "Timer Fired: Send update\n");
         updCnt = 0;
@@ -175,6 +179,11 @@ int main(int argc, char *argv[]) {
             upd.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
             upd.entries[id].nexthop = 0;
             upd.entries[id].metric = convertBigSmallEndian32(table[i].metric);
+            if ((double)(time - table[i].timestamp) / CLOCKS_PER_SEC > TIMEOUT) {
+              // 路由表项超时，这里采取简单的做法，直接发出报文——一个更好的做法是等待一段时间之后未被更新再发出报文
+              upd.entries[id].metric = 16;
+              enabled[i] = false;
+            }
             if (upd.numEntries == RIP_MAX_ENTRY) {
               sendRipUpdate(upd);
               upd.numEntries = 0;
@@ -278,6 +287,7 @@ int main(int argc, char *argv[]) {
             entry.len  = getLenFromMask(convertBigSmallEndian32(rip.entries[i].mask));
             entry.if_index = if_index;
             entry.metric = convertBigSmallEndian32(rip.entries[i].metric);
+            entry.timestamp = HAL_GetTicks();
             entry.nexthop = srcAddr;
             bool suc = update(entry);
             if (suc) {

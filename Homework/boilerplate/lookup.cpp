@@ -13,6 +13,7 @@ typedef struct {
   uint32_t len; // 小端序，前缀长度
   uint32_t if_index; // 小端序，出端口编号
   uint32_t metric;   // 小端序
+  uint64_t timestamp;// 小端序
   uint32_t nexthop; // 大端序，下一跳的 IPv4 地址
 } RoutingTableEntry;
    约定 addr 和 nexthop 以 **大端序** 存储。
@@ -74,7 +75,8 @@ bool update(RoutingTableEntry entry) {
         // 不删除，仅更新
         table[ind] = entry;
       } else {
-        // 无实质变动，返回 false
+        // 无实质变动，仅更新timestamp，并返回 false
+        table[ind].timestamp = entry.timestamp;
         return false;
       }
     } else if (entry.metric + 1 < table[ind].metric) {
