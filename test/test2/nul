@@ -1,0 +1,67 @@
+HAL_Init: found MAC addr of interface veth-2l
+HAL_Init: found MAC addr of interface veth-2r
+HAL_Init: pcap capture enabled for veth-2l
+HAL_Init: pcap capture enabled for veth-2r
+HAL_Init: pcap capture disabled for eth3, either the interface does not exist or permission is denied
+HAL_Init: pcap capture disabled for eth4, either the interface does not exist or permission is denied
+HAL_Init: Joining RIP multicast group 224.0.0.9 for veth-2l
+HAL_Init: Joining RIP multicast group 224.0.0.9 for veth-2r
+
+Printing table... now: 11699876
+Addr: 192.168.3.0/24  if_index: 0  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.4.0/24  if_index: 1  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.2.0/24  if_index: 2  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.3.0/24  if_index: 3  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+
+Printing table... now: 11704884
+Addr: 192.168.3.0/24  if_index: 0  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.4.0/24  if_index: 1  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.2.0/24  if_index: 2  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.3.0/24  if_index: 3  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.2.0/24  if_index: 0  metric: 1  nexthop:192.168.3.1  timestamp: 11699884:
+Addr: 192.168.5.0/24  if_index: 1  metric: 1  nexthop:192.168.4.2  timestamp: 11699884:
+
+Printing table... now: 11710884
+Addr: 192.168.3.0/24  if_index: 0  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.4.0/24  if_index: 1  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.2.0/24  if_index: 2  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.3.0/24  if_index: 3  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.2.0/24  if_index: 0  metric: 1  nexthop:192.168.3.1  timestamp: 11699884:
+Addr: 192.168.5.0/24  if_index: 1  metric: 1  nexthop:192.168.4.2  timestamp: 11699884:
+
+Printing table... now: 11716396
+Addr: 192.168.3.0/24  if_index: 0  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.4.0/24  if_index: 1  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.2.0/24  if_index: 2  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.3.0/24  if_index: 3  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.2.0/24  if_index: 0  metric: 1  nexthop:192.168.3.1  timestamp: 11715396:
+Addr: 192.168.5.0/24  if_index: 1  metric: 1  nexthop:192.168.4.2  timestamp: 11699884:
+
+Printing table... now: 11722396
+Addr: 192.168.3.0/24  if_index: 0  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.4.0/24  if_index: 1  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.2.0/24  if_index: 2  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.3.0/24  if_index: 3  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.2.0/24  if_index: 0  metric: 1  nexthop:192.168.3.1  timestamp: 11715396:
+Addr: 192.168.5.0/24  if_index: 1  metric: 1  nexthop:192.168.4.2  timestamp: 11699884:
+Timer Fired: Send update
+
+Printing table... now: 11728396
+Addr: 192.168.3.0/24  if_index: 0  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.4.0/24  if_index: 1  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.2.0/24  if_index: 2  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.3.0/24  if_index: 3  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.2.0/24  if_index: 0  metric: 1  nexthop:192.168.3.1  timestamp: 11715396:
+Addr: 192.168.5.0/24  if_index: 1  metric: 1  nexthop:192.168.4.2  timestamp: 11699884:
+
+Printing table... now: 11733852
+Addr: 192.168.3.0/24  if_index: 0  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.4.0/24  if_index: 1  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.2.0/24  if_index: 2  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 10.0.3.0/24  if_index: 3  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.2.0/24  if_index: 0  metric: 1  nexthop:192.168.3.1  timestamp: 11715396:
+Addr: 192.168.5.0/24  if_index: 1  metric: 1  nexthop:192.168.4.2  timestamp: 11728852:
+
+Printing table... now: 11739852
+Addr: 192.168.3.0/24  if_index: 0  metric: 1  nexthop:0.0.0.0  timestamp: 0:
+Addr: 192.168.4.0/24  if_index: 1  metric: 1  nexthop:0.0.

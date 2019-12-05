@@ -132,8 +132,23 @@ void sendRipUpdate(const RipPacket &upd) {
   }
 }
 
+void sendRipRequest() {
+  // 向各网口发送 rip 请求报文
+  RipPacket rip;
+  rip.numEntries = 1;
+  rip.command = 1;
+  rip.entries[0].addr = 0;
+  rip.entries[0].mask = 0;
+  rip.entries[0].nexthop = 0;
+  rip.entries[0].metric = convertBigSmallEndian32(16);
+  for (int i = 0; i < RIP_MAX_ENTRY; ++i) {
+    sendRipPacketByHAL(i, rip, multicastAddr, multicastMac);
+  }
+}
+
 int main(int argc, char *argv[]) {
   freopen("nul", "w", stdout);
+  // freopen("nul", "w", stderr);
   srand(time(NULL));
   ipTag = (uint32_t)rand();
   int res = HAL_Init(1, addrs);
@@ -160,6 +175,9 @@ int main(int argc, char *argv[]) {
     };
     update(entry);
   }
+
+  // 加入时向各网口发出请求报文
+  sendRipRequest();
 
   uint64_t last_time = 0;
   int updCnt = 0;  // 每计6次（5*6 = 30s）进行一次更新
