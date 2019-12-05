@@ -88,7 +88,7 @@ uint32_t getMaskFromLen(uint32_t len) {
 
 uint32_t getLenFromMask(uint32_t mask) {
   // 从 mask 得到其为 1 的位数，保证mask符合格式 【注意此处也为小端序】
-  int tmp = (1 << 31), ret = 0;
+  uint32_t tmp = (1 << 31), ret = 0;
   while (mask & tmp) {
     tmp >>= 1;
     ++ret;

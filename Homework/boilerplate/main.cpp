@@ -9,7 +9,7 @@
 #define RIP_MAX_ENTRY 25
 
 extern bool validateIPChecksum(uint8_t *packet, size_t len);
-extern void update(RoutingTableEntry entry);
+extern bool update(RoutingTableEntry entry);
 extern bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index);
 extern bool forward(uint8_t *packet, size_t len);
 extern bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output);
@@ -36,7 +36,15 @@ uint16_t ipTag;  // ip头中的16位标识
 // 2: 10.0.2.1
 // 3: 10.0.3.1
 // 你可以按需进行修改，注意端序
-in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0100000a, 0x0101000a, 0x0102000a, 0x0103000a};
+// in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0100000a, 0x0101000a, 0x0102000a, 0x0103000a};
+
+
+// TODO: 记得更改正确的 IP 地址，以及对应的接口名称(在standard.h中修改)
+// 0: 192.168.3.2
+// 1: 192.168.4.1
+// 2: 10.0.2.1
+// 3: 10.0.3.1
+in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0203A8C0, 0x0104A8C0, 0x0102000a, 0x0103000a};
 const in_addr_t multicastAddr = 0x090000E0;  // ripv2 的组播地址 224.0.0.9
 macaddr_t multicastMac;
 
@@ -45,7 +53,7 @@ void sendRipPacketByHAL(const uint32_t &if_index, const RipPacket &rip, in_addr_
   // assemble
   // 为了获得 rip_len, 先填入 rip 部分:
   uint32_t rip_len = assemble(&rip, &output[20 + 8]);
-  in_addr_t srcAddr = addr[if_index];
+  in_addr_t srcAddr = addrs[if_index];
   // IP
   ++ipTag;
   output[0]  = 0x45;
@@ -100,10 +108,11 @@ void sendRipUpdate(const RipPacket &upd) {
     resp.command = 2;
     for (int j = 0; j < upd.numEntries; ++j) {
       // 毒性逆转
-      if (!isInSameNetworkSegment(upd.entries[j].addr, addrs[i])) {
+      uint32_t len = getLenFromMask(convertBigSmallEndian32(upd.entries[j].mask));
+      if (!isInSameNetworkSegment(upd.entries[j].addr, addrs[i], len)) {
         uint32_t id = resp.numEntries++;
         resp.entries[id] = upd.entries[j];
-        if (isInSameNetworkSegment(resp.entries[id].nexthop, addrs[i])) {
+        if (isInSameNetworkSegment(resp.entries[id].nexthop, addrs[i], len)) {
           resp.entries[id].metric = convertBigSmallEndian32(16);
         }
       }
@@ -115,6 +124,7 @@ void sendRipUpdate(const RipPacket &upd) {
 }
 
 int main(int argc, char *argv[]) {
+  // freopen("out", "w", stdout);
   srand(time(NULL));
   ipTag = (uint32_t)rand();
   int res = HAL_Init(1, addrs);
@@ -143,7 +153,8 @@ int main(int argc, char *argv[]) {
   uint64_t last_time = 0;
   while (1) {
     uint64_t time = HAL_GetTicks();
-    if (time > last_time + 30 * 1000) {
+    printf("%lld\n", (long long)time);
+    if (time > last_time + 5 * 1000) {
       // 例行更新
       RipPacket upd;
       upd.command = 2;
@@ -172,8 +183,10 @@ int main(int argc, char *argv[]) {
     macaddr_t srcMac;
     macaddr_t dstMac;
     int if_index;
+    printf("Trying to receive...\n");
     res = HAL_ReceiveIPPacket(mask, packet, sizeof(packet), srcMac,
         dstMac, 1000, &if_index);
+    printf("Received successfully. res: %d", res);
     if (res == HAL_ERR_EOF) {
       break;
     } else if (res < 0) {
