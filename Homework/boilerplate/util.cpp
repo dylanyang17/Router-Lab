@@ -37,6 +37,8 @@ uint16_t calcUDPChecksum(uint8_t *packet, size_t len, in_addr_t srcAddr, in_addr
   // 源ip和目的ip分别为srcAddr和dstAddr，目的是作为伪首部计算校验和
   uint32_t sum = 0;
   // 伪首部
+  srcAddr = convertBigSmallEndian32(srcAddr);
+  dstAddr = convertBigSmallEndian32(dstAddr);  // 需要转换为小端，这样按下面的做法，对应到伪首部时才是大端序
   cycleSum(sum, (uint16_t)(srcAddr >> 16));
   cycleSum(sum, (uint16_t)(srcAddr & 0xFFFF));
   cycleSum(sum, (uint16_t)(dstAddr >> 16));
