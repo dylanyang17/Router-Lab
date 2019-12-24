@@ -63,11 +63,12 @@ bool update(RoutingTableEntry entry) {
   // NOTE: 注意这里对 entry 进行了子网掩码的与操作，以保证entry的addr的主机标识为0，即仅最低 len 位可能出现非零
   entry.addr &= convertBigSmallEndian32(getMaskFromLen(entry.len));
   int ind = find(entry);
+  ++entry.metric;  // 在此处进行了加1
   if (ind != -1) {
     // 原表项中存在该网段
     if (table[ind].nexthop == entry.nexthop) {
       // 首先判断来源是否相同，相同则直接更新
-      if (entry.metric == 16) {
+      if (entry.metric >= 16) {
         // 删除表项
         enabled[ind] = false;
         return true;
@@ -79,8 +80,8 @@ bool update(RoutingTableEntry entry) {
         table[ind].timestamp = entry.timestamp;
         return false;
       }
-    } else if (entry.metric + 1 < table[ind].metric) {
-      // 否则若新 metric + 1 < 旧 metric
+    } else if (entry.metric < table[ind].metric) {
+      // 否则若新 metric < 旧 metric
       table[ind] = entry;
       return true;
     } else {

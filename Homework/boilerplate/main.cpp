@@ -36,6 +36,8 @@ extern void printAddr(const in_addr_t &addr, FILE *file);
 extern void printRouteEntry(const RoutingTableEntry &entry, FILE *file);
 extern void printRouteTable(uint64_t time, FILE *file);
 
+bool DEBUG = false;  // 是否输出调试信息
+
 uint8_t packet[2048];
 uint8_t output[2048];
 uint16_t ipTag;  // ip头中的16位标识
@@ -109,7 +111,7 @@ void sendRipUpdate(const RipPacket &upd) {
   // nexthop 与出接口在同一网段的，发送的 metric 设为 16（毒逆）
   // NOTE: 这样的毒逆默认了路由器不会在同一接口上进行转发
   // 也就是说默认同一网段可互达
-  printf("sendRipUpdate\n");
+  if (DEBUG) printf("sendRipUpdate\n");
   RipPacket resp;
   for (int i = 0; i < N_IFACE_ON_BOARD; ++i) {
     macaddr_t mac;
@@ -147,11 +149,11 @@ void sendRipRequest() {
 }
 
 int main(int argc, char *argv[]) {
-  freopen("nul", "w", stdout);
-  // freopen("nul", "w", stderr);
+  freopen("nul", "w", stdout);  // 用于不输出琐碎的信息
+  // freopen("nul", "w", stderr);  // 用于不输出关键的信息
   srand(time(NULL));
   ipTag = (uint32_t)rand();
-  int res = HAL_Init(1, addrs);
+  int res = HAL_Init(DEBUG, addrs);
   int messageId = 0;  // for debug
   if (res < 0) {
     return res;
@@ -169,7 +171,7 @@ int main(int argc, char *argv[]) {
       .addr = addrs[i], // big endian
       .len = 24, // small endian
       .if_index = i, // small endian
-      .metric = 1,  // small endian
+      .metric = 0,  // small endian
       .timestamp = 0,  // small endian  直连网络不需要timestamp
       .nexthop = 0 // big endian, means direct
     };
@@ -187,7 +189,7 @@ int main(int argc, char *argv[]) {
       // 例行更新
       // 发出响应报文之前记得确认timestamp
       if (++updCnt == 6) {
-        fprintf(stderr, "Timer Fired: Send update\n");
+        if(DEBUG) fprintf(stderr, "Timer Fired: Send update\n");
         updCnt = 0;
         RipPacket upd;
         upd.command = 2;
@@ -237,10 +239,10 @@ int main(int argc, char *argv[]) {
       continue;
     }
     ++messageId;
-    printf("%d:: Valid Message. res: %d\n", messageId, res);
+    if (DEBUG) printf("%d:: Valid Message. res: %d\n", messageId, res);
 
     if (!validateIPChecksum(packet, res)) {
-      printf("%d:: Invalid IP Checksum\n", messageId);
+      if (DEBUG) printf("%d:: Invalid IP Checksum\n", messageId);
       continue;
     }
     in_addr_t srcAddr, dstAddr;
@@ -259,7 +261,7 @@ int main(int argc, char *argv[]) {
     bool isMulti = (dstAddr == multicastAddr);
     if (isMulti || dst_is_me) {  
       // 224.0.0.9 or me，进行接收处理
-      printf("%d:: Dst is me or multicast.\n", messageId);
+      if (DEBUG) printf("%d:: Dst is me or multicast.\n", messageId);
       RipPacket rip;
       if (disassemble(packet, res, &rip)) {
         // 为 rip 数据报
@@ -267,7 +269,7 @@ int main(int argc, char *argv[]) {
           // request
           // 请求报文必须满足 metric 为 16，注意 metric 为大端序
           // 注意若表项数目大于 25，则需要分开发送
-          printf("%d:: Received rip request.\n", messageId);
+          if (DEBUG) printf("%d:: Received rip request.\n", messageId);
           uint32_t metricSmall = convertBigSmallEndian32(rip.entries[0].metric);
           if (metricSmall != 16) continue;
           RipPacket resp;
@@ -298,7 +300,7 @@ int main(int argc, char *argv[]) {
           }
         } else {
           // response
-          printf("%d:: Received rip response.\n", messageId);
+          if (DEBUG) printf("%d:: Received rip response.\n", messageId);
           RipPacket upd;
           upd.numEntries = 0;
           upd.command = 2;
@@ -313,7 +315,7 @@ int main(int argc, char *argv[]) {
             bool suc = update(entry);
             if (suc) {
               // 若更新路由表成功，触发更新
-              printf("%d:: Update router successfully.", messageId);
+              if (DEBUG) printf("%d:: Update router successfully.", messageId);
               printRouteEntry(entry, stdout);
               uint32_t id = upd.numEntries++;
               upd.entries[id] = rip.entries[i];
@@ -332,7 +334,7 @@ int main(int argc, char *argv[]) {
     } else {
       // forward
       // beware of endianness
-      printf("%d:: Forward.\n", messageId);
+      if (DEBUG) printf("%d:: Forward.\n", messageId);
       uint32_t nexthop, dest_if;
       if (query(dstAddr, &nexthop, &dest_if)) {
         // found
@@ -343,28 +345,27 @@ int main(int argc, char *argv[]) {
         }
         if (HAL_ArpGetMacAddress(dest_if, nexthop, dest_mac) == 0) {
           // found
-          memcpy(output, packet, res);
           // update ttl and checksum
-          forward(output, res);
+          forward(packet, res);
           // check ttl!=0
-          if (output[8] != 0) {
-            HAL_SendIPPacket(dest_if, output, res, dest_mac);
-            printf("%d:: Forward successfully. dest_if: %d  Nexthop:", messageId, dest_if);
+          if (packet[8] != 0) {
+            HAL_SendIPPacket(dest_if, packet, res, dest_mac);
+            if (DEBUG) printf("%d:: Forward successfully. dest_if: %d  Nexthop:", messageId, dest_if);
             printAddr(nexthop, stdout);
-            printf("\n");
+            if (DEBUG) printf("\n");
           } else {
             // ttl == 0
-            printf("%d:: TTL is 0.\n", messageId);
+            if (DEBUG) printf("%d:: TTL is 0.\n", messageId);
           }
         } else {
           // not found
-          printf("%d:: Failed to get mac address. dest_if: %d Nexthop:", messageId, dest_if);
+          if (DEBUG) printf("%d:: Failed to get mac address. dest_if: %d Nexthop:", messageId, dest_if);
           printAddr(nexthop, stdout);
-          printf("\n");
+          if (DEBUG) printf("\n");
         }
       } else {
         // not found
-        printf("%d:: No matching item in table.\n", messageId);
+        if (DEBUG) printf("%d:: No matching item in table.\n", messageId);
       }
     }
   }
