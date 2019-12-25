@@ -182,13 +182,15 @@ int main(int argc, char *argv[]) {
 
   uint64_t last_time = 0;
   int updCnt = 0;  // 每计6次（5*6 = 30s）进行一次更新
+  bool first_send = false;
   while (1) {
     uint64_t time = HAL_GetTicks();
-    if (time > last_time + 5 * TICKS_PER_SEC) {
+    if (!first_send || time > last_time + 5 * TICKS_PER_SEC) {
       // 例行更新
       // 发出响应报文之前记得确认timestamp
-      if (++updCnt == 6) {
+      if (!first_send || ++updCnt == 6) {
         if(DEBUG) fprintf(stderr, "Timer Fired: Send update\n");
+        first_send = true;
         updCnt = 0;
         RipPacket upd;
         upd.command = 2;
