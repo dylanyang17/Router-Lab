@@ -1,13 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <vector>
 #include "router_hal.h"
 #include "router.h"
-#define MAXN 105
 
-extern RoutingTableEntry table[MAXN];
-extern bool enabled[MAXN];
-extern bool DEBUG;
+extern std::vector<RoutingTableEntry> table;
 
 uint32_t convertBigSmallEndian32(uint32_t num) {
   return (((num >> 0) & 0xFF) << 24) |
@@ -119,28 +117,22 @@ bool isInSameNetworkSegment(in_addr_t addr1, in_addr_t addr2, uint32_t len) {
 
 void printAddr(const in_addr_t &addr, FILE *file) {
   // 按照 ***.***.***.***/** 的格式输出地址
-  if (DEBUG) fprintf(file, "%d.%d.%d.%d",(addr) & 0xFF,
+  fprintf(file, "%d.%d.%d.%d",(addr) & 0xFF,
       (addr>>8) & 0xFF, (addr>>16) & 0xFF, (addr>>24) & 0xFF);
 }
 
 void printRouteEntry(const RoutingTableEntry &entry, FILE *file) {
-  if (DEBUG) {
-    fprintf(file, "Addr: "); printAddr(entry.addr, file); fprintf(file, "/%d", entry.len);
-    fprintf(file, "  if_index: %d", entry.if_index);
-    fprintf(file, "  metric: %d", entry.metric);
-    fprintf(file, "  nexthop:"); printAddr(entry.nexthop, file);
-    fprintf(file, "  timestamp: %lld:", entry.timestamp);
-    fprintf(file, "\n");
-  }
+  fprintf(file, "Addr: "); printAddr(entry.addr, file); fprintf(file, "/%d", entry.len);
+  fprintf(file, "  if_index: %d", entry.if_index);
+  fprintf(file, "  metric: %d", entry.metric);
+  fprintf(file, "  nexthop:"); printAddr(entry.nexthop, file);
+  fprintf(file, "  timestamp: %lld", entry.timestamp);
+  fprintf(file, "\n");
 }
 
 void printRouteTable(uint64_t time, FILE *file) {
-  if (DEBUG) {
-    fprintf(file, "\nPrinting table... now: %lld\n", time);
-    for(int i = 0; i < MAXN; ++i) {
-      if (enabled[i]) {
-        printRouteEntry(table[i], file);
-      }
-    }
+  fprintf(file, "\nPrinting table... now: %lld\n", time);
+  for(int i = 0; i < table.size(); ++i) {
+    printRouteEntry(table[i], file);
   }
 }

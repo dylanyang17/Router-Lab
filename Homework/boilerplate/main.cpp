@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <vector>
 #define RIP_MAX_ENTRY 25
 #define TICKS_PER_SEC 1000
 #define TIMEOUT 60
@@ -28,15 +29,13 @@ extern uint32_t getMaskFromLen(uint32_t len);
 extern uint32_t getLenFromMask(uint32_t mask);
 extern bool isInSameNetworkSegment(in_addr_t addr1, in_addr_t addr2, uint32_t len);
 
-extern const int MAXN = 105;
-extern RoutingTableEntry table[MAXN];
-extern bool enabled[MAXN];
+extern std::vector<RoutingTableEntry> table;
 
 extern void printAddr(const in_addr_t &addr, FILE *file);
 extern void printRouteEntry(const RoutingTableEntry &entry, FILE *file);
 extern void printRouteTable(uint64_t time, FILE *file);
 
-bool DEBUG = false;  // 是否输出调试信息
+bool DEBUG = false;  // 是否输出调试信息(总开关)，不能关闭路由表打印
 
 uint8_t packet[2048];
 uint8_t output[2048];
@@ -194,23 +193,21 @@ int main(int argc, char *argv[]) {
         RipPacket upd;
         upd.command = 2;
         upd.numEntries = 0;
-        for (int i = 0; i < MAXN; ++i) {
-          if (enabled[i]) {
-            uint32_t id = upd.numEntries++;
-            upd.entries[id].addr = table[i].addr;
-            upd.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
-            upd.entries[id].nexthop = 0;
-            upd.entries[id].metric = convertBigSmallEndian32(table[i].metric);
-            upd.entries[id].localTableInd = i;
-            if (table[i].nexthop != 0 && (double)(time - table[i].timestamp) / TICKS_PER_SEC > TIMEOUT) {
-              // 非直连，且路由表项超时，这里采取简单的做法，直接发出报文——一个更好的做法是等待一段时间之后未被更新再发出报文
-              upd.entries[id].metric = convertBigSmallEndian32(16);
-              enabled[i] = false;
-            }
-            if (upd.numEntries == RIP_MAX_ENTRY) {
-              sendRipUpdate(upd);
-              upd.numEntries = 0;
-            }
+        for (int i = 0; i < table.size(); ++i) {
+          uint32_t id = upd.numEntries++;
+          upd.entries[id].addr = table[i].addr;
+          upd.entries[id].mask = convertBigSmallEndian32(getMaskFromLen(table[i].len));
+          upd.entries[id].nexthop = 0;
+          upd.entries[id].metric = convertBigSmallEndian32(table[i].metric);
+          upd.entries[id].localTableInd = i;
+          if (table[i].nexthop != 0 && (double)(time - table[i].timestamp) / TICKS_PER_SEC > TIMEOUT) {
+            // 非直连，且路由表项超时，这里采取简单的做法，直接发出报文——一个更好的做法是等待一段时间之后未被更新再发出报文
+            upd.entries[id].metric = convertBigSmallEndian32(16);
+            table.erase(table.begin() + i);
+          }
+          if (upd.numEntries == RIP_MAX_ENTRY) {
+            sendRipUpdate(upd);
+            upd.numEntries = 0;
           }
         }
         if (upd.numEntries) {
@@ -276,8 +273,8 @@ int main(int argc, char *argv[]) {
           // 封装响应报文，注意选择路由条目
           resp.command = 2;  // response
           resp.numEntries = 0;
-          for (int j = 0; j < MAXN; ++j) {
-            if (enabled[j] && !isInSameNetworkSegment(table[j].addr, srcAddr, table[j].len)) {
+          for (int j = 0; j < table.size(); ++j) {
+            if (!isInSameNetworkSegment(table[j].addr, srcAddr, table[j].len)) {
               // 与来源ip的网段不同
               uint32_t id = resp.numEntries++;
               resp.entries[id].addr = table[j].addr;
@@ -315,7 +312,7 @@ int main(int argc, char *argv[]) {
             bool suc = update(entry);
             if (suc) {
               // 若更新路由表成功，触发更新
-              if (DEBUG) printf("%d:: Update router successfully.", messageId);
+              printf("%d:: Update router successfully.", messageId);
               printRouteEntry(entry, stdout);
               uint32_t id = upd.numEntries++;
               upd.entries[id] = rip.entries[i];
@@ -351,7 +348,7 @@ int main(int argc, char *argv[]) {
           if (packet[8] != 0) {
             HAL_SendIPPacket(dest_if, packet, res, dest_mac);
             if (DEBUG) printf("%d:: Forward successfully. dest_if: %d  Nexthop:", messageId, dest_if);
-            printAddr(nexthop, stdout);
+            if (DEBUG) printAddr(nexthop, stdout);
             if (DEBUG) printf("\n");
           } else {
             // ttl == 0
@@ -360,7 +357,7 @@ int main(int argc, char *argv[]) {
         } else {
           // not found
           if (DEBUG) printf("%d:: Failed to get mac address. dest_if: %d Nexthop:", messageId, dest_if);
-          printAddr(nexthop, stdout);
+          if (DEBUG) printAddr(nexthop, stdout);
           if (DEBUG) printf("\n");
         }
       } else {

@@ -1,11 +1,9 @@
 #include "router.h"
 #include <stdint.h>
 #include <stdlib.h>
+#include <vector>
 
-
-const int MAXN = 105;
-RoutingTableEntry table[MAXN];
-bool enabled[MAXN];
+std::vector<RoutingTableEntry> table;
 
 /*
 typedef struct {
@@ -30,17 +28,8 @@ extern uint32_t getMaskFromLen(uint32_t len);
 
 int find(const RoutingTableEntry &entry) {
   // 找到 addr 和 len 同 entry 均相同的表项，返回其下标，未找到则返回 -1
-  for (int i = 0; i < MAXN; ++i) {
-    if (table[i].addr == entry.addr && table[i].len == entry.len && enabled[i])
-      return i;
-  }
-  return -1;
-}
-
-int findEmpty() {
-  // 找到一个空表项下标
-  for (int i = 0; i < MAXN; ++i) {
-    if (enabled[i] == false)
+  for (int i = 0; i < table.size(); ++i) {
+    if (table[i].addr == entry.addr && table[i].len == entry.len)
       return i;
   }
   return -1;
@@ -70,7 +59,7 @@ bool update(RoutingTableEntry entry) {
       // 首先判断来源是否相同，相同则直接更新
       if (entry.metric >= 16) {
         // 删除表项
-        enabled[ind] = false;
+        table.erase(table.begin() + ind);
         return true;
       } else if (entry.metric != table[ind].metric){
         // 不删除，仅更新
@@ -89,9 +78,8 @@ bool update(RoutingTableEntry entry) {
     }
   } else if (entry.metric < 16){
     // 原表项中不存在该网段且新metric<16
-    ind = findEmpty();
-    table[ind] = entry;
-    enabled[ind] = true;
+    // TODO
+    table.push_back(entry);
     return true;
   } else {
     return false;
@@ -118,8 +106,8 @@ bool match(const RoutingTableEntry &entry, uint32_t addr) {
  */
 bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index) {
   int ind = -1;
-  for (int i = 0; i < MAXN; ++i) {
-    if (enabled[i] && match(table[i], addr)) {
+  for (int i = 0; i < table.size(); ++i) {
+    if (match(table[i], addr)) {
       if (ind == -1 || table[i].len > table[ind].len)
         ind = i;
     }

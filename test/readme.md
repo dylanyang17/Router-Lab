@@ -42,3 +42,6 @@ net4:: veth-4l: 192.168.5.2
 
 ### test3
 
+在 test2 的基础上，加入了压测，也就是在PC1和PC具体可见根目录下的README。
+
+test3\_small、test3\_medium、test3\_large分别对应小规模、中规模、大规模压测。
