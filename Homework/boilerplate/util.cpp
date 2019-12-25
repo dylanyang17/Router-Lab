@@ -133,7 +133,7 @@ void printRouteEntry(const RoutingTableEntry &entry, FILE *file) {
 void printRouteTable(uint64_t time, FILE *file) {
   fprintf(file, "\nPrinting table... now: %lld\n", time);
   if (table.size() > 20) {
-    printf("size: %d", table.size());
+    fprintf(file, "size: %d", table.size());
   } else {
     for(int i = 0; i < table.size(); ++i) {
       printRouteEntry(table[i], file);

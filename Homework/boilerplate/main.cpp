@@ -122,7 +122,8 @@ void sendRipUpdate(const RipPacket &upd) {
       if (!isInSameNetworkSegment(upd.entries[j].addr, addrs[i], len)) {
         uint32_t id = resp.numEntries++;
         resp.entries[id] = upd.entries[j];
-        if (isInSameNetworkSegment(table[resp.entries[id].localTableInd].nexthop, addrs[i], len)) {
+        // if (isInSameNetworkSegment(table[resp.entries[id].localTableInd].nexthop, addrs[i], len)) {
+        if (i == table[resp.entries[id].localTableInd].if_index) {
           resp.entries[id].metric = convertBigSmallEndian32(16);
         }
       }
@@ -188,8 +189,8 @@ int main(int argc, char *argv[]) {
     if (!first_send || time > last_time + 5 * TICKS_PER_SEC) {
       // 例行更新
       // 发出响应报文之前记得确认timestamp
-      if (!first_send || ++updCnt == 6) {
-        if(DEBUG) fprintf(stderr, "Timer Fired: Send update\n");
+      if (!first_send || ++updCnt == 1) {
+        fprintf(stderr, "Timer Fired: Send update\n");
         first_send = true;
         updCnt = 0;
         RipPacket upd;
