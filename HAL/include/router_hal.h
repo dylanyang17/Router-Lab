@@ -14,7 +14,7 @@ typedef uint32_t in_addr_t;
 #endif
 // in_addr_t 是以大端序存储的，意味着 1.2.3.4 对应 0x04030201
 
-#define N_IFACE_ON_BOARD 4
+#define N_IFACE_ON_BOARD 3
 typedef uint8_t macaddr_t[6];
 
 enum HAL_ERROR_NUMBER {

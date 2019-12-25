@@ -53,7 +53,7 @@ uint16_t ipTag;  // ip头中的16位标识
 // 1: 192.168.4.1
 // 2: 10.0.2.1
 // 3: 10.0.3.1
-in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0203A8C0, 0x0104A8C0, 0x0102000a, 0x0103000a};
+in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0101A8C0, 0x0103A8C0, 0x0102A8C0};
 const in_addr_t multicastAddr = 0x090000E0;  // ripv2 的组播地址 224.0.0.9
 macaddr_t multicastMac;
 
